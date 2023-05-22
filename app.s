@@ -19,17 +19,13 @@
 	.globl main
 
 main:
-	// x0 contiene la direccion base del framebuffer
-	mov     x28, x0 // Guarda la dirección base del framebuffer en x28
-	//---------------- CODE HERE ------------------------------------
+	mov     x28, x0         // Save framebuffer address to x28
 
-        mov     x0, #320        // Player x coordinate        1 (bottom) <= x <= SCREEN_HEIGHT (top)
-        mov     x1, #240        // Player y coordinate        1 (right) <= x <= SCREEN_WIDTH (left)
-
-        mov     x2, 0           // bg color index | default 0
-        ldr     w3, BG_COLORS   // bg color | default BG_COLORS[0]
-
-        ldr     x14, PLAYER_COLOR
+        mov     x0, #320                // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
+        mov     x1, #240                // Player y coordinate         (right) 1 <= x <= SCREEN_WIDTH (left)
+        mov     x2, 0                   // bg color index | default 0
+        ldr     w3, BG_COLORS           // bg color | default BG_COLORS[0]
+        ldr     w4, PLAYER_COLOR        // player color | default PLAYER_COLOR
 
 	// Ejemplo de uso de gpios
 	mov     x9, GPIO_BASE
@@ -41,40 +37,30 @@ main:
 	str     wzr, [x9, GPIO_GPFSEL0]
 
 draw_screen:
-        mov     x5, x28         // X5 = &framebuffer[0]
-	mov     x20, SCREEN_HEIGH // Y Size
+        mov     x19, x28                // Set x19 to beginning of framebuffer
+	mov     x21, SCREEN_HEIGH       // Set x21 to remaining rows
 next_row:
-	mov     x19, SCREEN_WIDTH // X Size
+	mov     x20, SCREEN_WIDTH       // Set x20 to remaining columns
 next_col:
-        cmp     x19, x0
+        cmp     x20, x0                 // Check if we are in same column as player
         b.ne    pxl_bg
-        cmp     x20, x1
+        cmp     x21, x1                 // Check if we are in same row as player
         b.ne    pxl_bg
 
 pxl_player:
-        stur    w14, [x5]               // Fill pixel with player color
+        stur    w4, [x19]              // Fill pixel with player color
         b       cont
+
 pxl_bg:
-        stur    w3, [x5]                // Fill pixel with bg color
+        stur    w3, [x19]               // Fill pixel with bg color
 
-cont:	add     x5, x5, BYTES_PER_PIXEL // Advance to next pixel
+cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 
-	sub     x19, x19, 1             // Decrementar contador X
-	cbnz    x19, next_col           // Si no terminó la fila, salto
+	sub     x20, x20, 1             // Decrement remaining columns
+	cbnz    x20, next_col           // If not at end of row, draw next column
 
-	sub     x20, x20, 1             // Decrementar contador Y
-	cbnz    x20, next_row           // Si no es la última fila, salto
-
-        // Draw player pixels
-        // mov     x8, BYTES_PER_PIXEL
-        // mul     x6, x3, x8
-        // mov     x7, SCREEN_WIDTH
-        // mul     x7, x7, x8
-        // mul     x7, x7, x4
-        // add     x6, x6, x7
-        // add     x6, x20, x6
-        // stur    x13, [x6]       // Colorear pixel player
-
+	sub     x21, x21, 1             // Decrement remaining rows
+	cbnz    x21, next_row           // If not at last row, draw next row
 
 	// And bit a bit mantiene el resultado del bit 2 en w10 (notar 0b... es binario)
 	// al inmediato se lo refiere como "máscara" en este caso:
@@ -83,7 +69,6 @@ cont:	add     x5, x5, BYTES_PER_PIXEL // Advance to next pixel
 	// - Al hacer AND con el complemento "limpia" el bit 2 (setea el bit 2 en 0)
 
         bl      handle_input
-
         bl      sel_bg_color
 
 redraw:
@@ -109,6 +94,7 @@ handle_input:
         str     x19, [sp, 8]
         str     x20, [sp, 16]
 
+        mov     x22, x3         // Save x3
         mov     x3, x2          // Use x3 as bg color index
 
 	mov     x19, GPIO_BASE
@@ -120,7 +106,8 @@ handle_input:
         bl      handle_d
         bl      handle_space
 
-        mov     x2, x3
+        mov     x2, x3          // Move bg color index back to x2
+        mov     x3, x22         // Restore x3
 
         ldr     x20, [sp, 16]
         ldr     x19, [sp, 8]
@@ -138,22 +125,18 @@ handle_input:
  *      x1: modified player y position
  */
 handle_w:
-        sub     sp, sp, 16
-        str     lr, [sp]
-        str     x19, [sp, 8]
+        stp     lr, x19, [sp, -16]!
 
 	and     x19, x2, GPIO_W
         cbz     x19, end_handle_w
 
-        cmp     x1, SCREEN_HEIGH        // Check if player is at the top
+        cmp     x1, SCREEN_HEIGH        // Check if player is touching top edge
         b.eq    end_handle_w
 
         add     x1, x1, 1               // Move player one position up
 
 end_handle_w:
-        ldr     x19, [sp, 8]
-        ldr     lr, [sp]
-        add     sp, sp, 16
+        ldp     lr, x19, [sp], 16
         ret
 
 /*
@@ -171,10 +154,10 @@ handle_s:
 	and     x19, x2, GPIO_S
         cbz     x19, end_handle_s
 
-        cmp     x1, 1                   // Check if player is at the bottom
+        cmp     x1, 1                   // Check if player is touching bottom edge
         b.eq    end_handle_s
 
-        sub     x1, x1, 1               // Move player one position up
+        sub     x1, x1, 1               // Move player one position down
 
 end_handle_s:
         ldp     lr, x19, [sp], 16
