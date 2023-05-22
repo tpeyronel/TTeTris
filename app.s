@@ -2,6 +2,7 @@
 	.equ SCREEN_HEIGH,   480
 	.equ BITS_PER_PIXEL, 32
 	.equ BYTES_PER_PIXEL, 4
+	.equ BYTES_PER_PIXEL_SHIFT, 2
 
 	.equ GPIO_BASE,    0x3f200000
 	.equ GPIO_GPFSEL0, 0x00
@@ -70,6 +71,12 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 
         bl      handle_input
         bl      sel_bg_color
+
+        stp     x2, x3, [sp, -16]!
+        mov     x2, x28
+        mov     x3, 100
+        bl      draw_circle_at
+        ldp     x2, x3, [sp], 16
 
 redraw:
         b draw_screen
@@ -257,3 +264,104 @@ sel_bg_color:
 
         ldp     lr, x19, [sp], 16
         ret
+
+/*
+ * Params:
+ *      x0: x coordinate
+ *      x1: y coordinate
+ *      x2: beginning of framebuffer
+ *      x3: radius
+ *      w4: color
+ * Returns:
+ *      x0: unmodified x coordinate
+ *      x1: unmodified y coordinate
+ *      x2: unmodified beginning of framebuffer
+ *      w3: -
+ */
+draw_circle_at:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        add     x19, x3, 1
+        mul     x19, x3, x19     // x19 "=" r^2 === r*(r+1)
+
+
+        sub     x21, xzr, x3    // x21 = current circle y coordinate
+circle_next_row:
+        sub     x20, xzr, x3    // x20 = current circle x coordinate
+circle_next_col:
+
+        mul     x22, x20, x20   // x22 = x^2
+        mul     x23, x21, x21   // x23 = y^2
+        add     x22, x22, x23   // x22 = x^2 + y^2
+        cmp     x22, x19
+        b.gt    skip_circle_pixel       // only draw if x^2 + y^2 <= r^2
+
+
+
+        stp     x0, x1, [sp, -16]!
+        mov     x22, x3
+        mov     w3, w4
+
+        add     x0, x0, x20
+        cmp     x0, SCREEN_WIDTH
+        b.hs    pixel_out_of_bounds       // Out of screen
+        add     x1, x1, x21
+        cmp     x1, SCREEN_HEIGH
+        b.hs    pixel_out_of_bounds       // Out of screen
+        bl      draw_pixel_at
+
+pixel_out_of_bounds:
+        mov     x3, x22
+        ldp     x0, x1, [sp], 16
+
+
+skip_circle_pixel:
+        add     x20, x20, 1
+        cmp     x20, x3
+        b.le    circle_next_col
+
+        add     x21, x21, 1
+        cmp     x21, x3
+        b.le    circle_next_row
+
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: y coordinate       (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: beginning of framebuffer
+ *      w3: color
+ * Returns:
+ *      x0: unmodified x coordinate
+ *      x1: unmodified y coordinate
+ *      x2: unmodified beginning of framebuffer
+ *      w3: unmodified color
+ */
+draw_pixel_at:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x19, (SCREEN_HEIGH - 1)
+        sub     x19, x19, x1
+
+        mov     x20, SCREEN_WIDTH
+        mul     x20, x20, x19                   // x20 = vertical offset
+        add     x20, x20, x0                    // x20 = vertical offset + horizontal offset
+        lsl     x20, x20, BYTES_PER_PIXEL_SHIFT // x20 = total offset
+        add     x20, x2, x20                    // x20 = &framebuffer[y][x]
+
+        str     w3, [x20]
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
