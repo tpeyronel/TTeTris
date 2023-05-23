@@ -27,14 +27,25 @@
 
 	.globl main
 
+/*
+ * x19: framebuffer address (could be x9-15 ?)
+ * x20: player x
+ * x21: player y
+ * x22: bg color index
+ * w23: bg color
+ * w24: player color
+ * x25: remaining columns of row
+ * x26: remaining rows
+ * x28 (const): beginning of framebuffer
+ */
 main:
 	mov     x28, x0         // Save framebuffer address to x28
 
-        mov     x0, #320                // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
-        mov     x1, #240                // Player y coordinate         (right) 1 <= x <= SCREEN_WIDTH (left)
-        mov     x2, 0                   // bg color index | default 0
-        ldr     w3, BG_COLORS           // bg color | default BG_COLORS[0]
-        ldr     w4, PLAYER_COLOR        // player color | default PLAYER_COLOR
+        mov     x20, #320                // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
+        mov     x21, #240                // Player y coordinate         (right) 1 <= x <= SCREEN_WIDTH (left)
+        mov     x22, 0                   // bg color index | default 0
+        ldr     w23, BG_COLORS           // bg color | default BG_COLORS[0]
+        ldr     w24, PLAYER_COLOR        // player color | default PLAYER_COLOR
 
 	// Ejemplo de uso de gpios
 	mov     x9, GPIO_BASE
@@ -47,29 +58,29 @@ main:
 
 draw_screen:
         mov     x19, x28                // Set x19 to beginning of framebuffer
-	mov     x21, SCREEN_HEIGH       // Set x21 to remaining rows
+	mov     x26, SCREEN_HEIGH       // Set x21 to remaining rows
 next_row:
-	mov     x20, SCREEN_WIDTH       // Set x20 to remaining columns
+	mov     x25, SCREEN_WIDTH       // Set x25 to remaining columns
 next_col:
-        cmp     x20, x0                 // Check if we are in same column as player
+        cmp     x25, x20                 // Check if we are in same column as player
         b.ne    pxl_bg
-        cmp     x21, x1                 // Check if we are in same row as player
+        cmp     x26, x21                 // Check if we are in same row as player
         b.ne    pxl_bg
 
 pxl_player:
-        stur    w4, [x19]              // Fill pixel with player color
+        stur    w24, [x19]              // Fill pixel with player color
         b       cont
 
 pxl_bg:
-        stur    w3, [x19]               // Fill pixel with bg color
+        stur    w23, [x19]               // Fill pixel with bg color
 
 cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 
-	sub     x20, x20, 1             // Decrement remaining columns
-	cbnz    x20, next_col           // If not at end of row, draw next column
+	sub     x25, x25, 1             // Decrement remaining columns
+	cbnz    x25, next_col           // If not at end of row, draw next column
 
-	sub     x21, x21, 1             // Decrement remaining rows
-	cbnz    x21, next_row           // If not at last row, draw next row
+	sub     x26, x26, 1             // Decrement remaining rows
+	cbnz    x26, next_row           // If not at last row, draw next row
 
 	// And bit a bit mantiene el resultado del bit 2 en w10 (notar 0b... es binario)
 	// al inmediato se lo refiere como "máscara" en este caso:
@@ -77,20 +88,46 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 	// - Al hacer OR "setea" el bit 2 en 1
 	// - Al hacer AND con el complemento "limpia" el bit 2 (setea el bit 2 en 0)
 
+        mov     x0, x20         // x0 = player x
+        mov     x1, x21         // x1 = player y
+        mov     x2, x22         // x2 = bg color index
         bl      handle_input
-        bl      sel_bg_color
+        mov     x20, x0
+        mov     x21, x1
+        mov     x22, x2
 
-        stp     x2, x3, [sp, -16]!
+
+        mov     x0, x22         // x0 = bg color index
+        bl      index_bg_color
+        mov     w23, w0
+
+        mov     x0, x20
+        mov     x1, x21
         mov     x2, x28
         mov     x3, 100
+        mov     w4, w24
         bl      draw_circle_at
-        ldp     x2, x3, [sp], 16
+
+
+        mov     x0, 80
+        mov     x1, 100
+        mov     x2, 400
+        mov     x3, 300
+        mov     x4, x28
+        mov     w5, w24
+        bl      draw_filled_rectangle
+
+
+        mov     x0, 400
+        mov     x1, 350
+        mov     x2, 100
+        mov     x3, x28
+        mov     w4, w24
+        bl      draw_filled_square
+
 
 redraw:
         b draw_screen
-
-InfLoop:
-	b InfLoop
 
 
 /*
@@ -255,20 +292,17 @@ end_handle_space:
 
 /*
  * Params:
- *      x2: background color index
- *      x3: -
+ *      x0: background color index
  * Returns:
- *      x2: unmodified background color index
- *      w3: background color
+ *      w0: background color
  */
-sel_bg_color:
+index_bg_color:
         stp     lr, x19, [sp, -16]!
 
-        mov     x3, x2          // x3 = i
-        lsl     x3, x3, 2       // x3 = i * 4
-        ldr     x19, =BG_COLORS
-        add     x3, x19, x3     // x3 = &BG_COLORS[0] + (i * 4) = &BG_COLORS[i]
-        ldr     w3, [x3]        // w3 = BG_COLORS[i]
+        lsl     x0, x0, 2       // x0 = i * 4
+        ldr     x19, =BG_COLORS // x19 = &BG_COLORS[0]
+        add     x0, x19, x0     // x0 = &BG_COLORS[0] + (i * 4) = &BG_COLORS[i]
+        ldr     w0, [x0]        // w0 = BG_COLORS[i]
 
         ldp     lr, x19, [sp], 16
         ret
@@ -371,5 +405,80 @@ draw_pixel_at:
 
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: bottom left x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: bottom left y coordinate       (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: top right x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x3: top right y coordinate       (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x4: beginning of framebuffer
+ *      w5: color
+ */
+draw_filled_rectangle:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        // TODO: check bounds?
+
+        // We need to move the framebuffer pointer to the initial position
+        mov     x19, (SCREEN_HEIGH - 1)
+        sub     x19, x19, x3                    // x19 = first row from top
+        mov     x20, SCREEN_WIDTH
+        mul     x19, x19, x20                   // x19 = initial vertical offset
+        add     x19, x19, x0                    // x19 = initial vertical offset + initial horizontal offset
+        lsl     x19, x19, BYTES_PER_PIXEL_SHIFT // x19 = total offset
+        add     x4, x4, x19                     // x4 = &framebuffer['rectangle's top left pixel']
+
+        sub     x19, x2, x0                     // x19 = rectangle width - 1
+        add     x19, x19, 1                     // x19 = rectangle width
+        sub     x20, x20, x19                   // x20 = pixels between the end of a row and the beginning of the next row
+        lsl     x20, x20, BYTES_PER_PIXEL_SHIFT // x20 = bytes between the end of a row and the beginning of the next row
+
+
+draw_filled_rectangle__next_row:
+        mov     x21, x19                        // x19 = rectangle width
+
+draw_filled_rectangle__next_col:
+        str     w5, [x4]                        // Paint pixel
+        add     x4, x4, BYTES_PER_PIXEL         // Advance to next pixel
+
+        subs    x21, x21, 1                     // Check if we finished current row
+        b.gt    draw_filled_rectangle__next_col // If not, then draw next column
+
+
+
+        add     x4, x4, x20                     // Advance to beginning of next row
+        add     x1, x1, 1
+        cmp     x1, x3
+        b.le    draw_filled_rectangle__next_row
+
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+/*
+ * Params:
+ *      x0: bottom left x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: bottom left y coordinate       (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: size
+ *      x3: beginning of framebuffer
+ *      w4: color
+ */
+draw_filled_square:
+        stp     lr, x19, [sp, -16]!
+
+        mov     w5, w4
+        mov     x4, x3
+        add     x3, x1, x2
+        add     x2, x0, x2
+        bl      draw_filled_rectangle
+
+        ldp     lr, x19, [sp], 16
         ret
 
