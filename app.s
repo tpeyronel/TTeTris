@@ -20,6 +20,8 @@
         // .equ GPIO_CLK_CTL_ADDRESS,      0x3f101070
         // .equ GPIO_CLK_DIV,              0x5A0C0000
         // .equ GPIO_CLK_CTL,              0x5A000011
+        .equ MS_PER_STEP,               500
+        .equ US_PER_STEP,               MS_PER_STEP * 1000
 
         BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x00F0000F
         BG_COLOR: .dword 0xFFFFFFFF
@@ -41,11 +43,17 @@
 main:
 	mov     x28, x0         // Save framebuffer address to x28
 
-        mov     x20, #320                // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
-        mov     x21, #240                // Player y coordinate         (right) 1 <= x <= SCREEN_WIDTH (left)
-        mov     x22, 0                   // bg color index | default 0
-        ldr     w23, BG_COLORS           // bg color | default BG_COLORS[0]
-        ldr     w24, PLAYER_COLOR        // player color | default PLAYER_COLOR
+        mov     x20, #320               // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
+        mov     x21, #240               // Player y coordinate         (right) 1 <= x <= SCREEN_WIDTH (left)
+        mov     x22, 0                  // bg color index | default 0
+        ldr     w23, BG_COLORS          // bg color | default BG_COLORS[0]
+        ldr     w24, PLAYER_COLOR       // player color | default PLAYER_COLOR
+
+        mov     x10, 0                  // square x coordinate
+        mov     x11, 0                  // square y coordinate
+        mov     x12, 50                 // square size
+        bl      get_time
+        mov     w13, w0                 // w13 last movement
 
 	// Ejemplo de uso de gpios
 	mov     x9, GPIO_BASE
@@ -125,6 +133,23 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         mov     w4, w24
         bl      draw_filled_square
 
+
+        mov     x0, x10
+        mov     x1, x11
+        mov     w2, w13
+        mov     x3, x12
+        bl      advance_square_maybe
+        mov     x10, x0
+        mov     x11, x1
+        mov     w13, w2
+
+
+        mov     x0, x10
+        mov     x1, x11
+        mov     x2, x12
+        mov     x3, x28
+        mov     w4, w24
+        bl      draw_filled_square
 
 redraw:
         b draw_screen
@@ -480,5 +505,86 @@ draw_filled_square:
         bl      draw_filled_rectangle
 
         ldp     lr, x19, [sp], 16
+        ret
+
+/*
+ * Returns:
+ *      w0: current time
+ */
+get_time:
+        ldr     x0, =SYS_TIMER_VALUE_ADDRESS
+        ldr     w0, [x0]
+        ret
+
+/*
+ * Params:
+ *      w0: previous_time
+ * Returns:
+ *      w0: elapsed_time
+ *      w1: current_time
+ */
+get_elapsed_time:
+        ldr     x1, =SYS_TIMER_VALUE_ADDRESS
+        ldr     w1, [x1]
+        sub     w0, w1, w0
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: square x coordinate
+ *      x1: square y coordinate
+ *      w2: previous step
+ *      x3: square size
+ * Returns:
+ *      x0: new square x coordinate
+ *      x1: new square y coordinate
+ *      w2: previous or new step
+ */
+advance_square_maybe:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x20, x0                 // x20 = x coordinate
+        mov     x21, x1                 // x21 = x coordinate
+        mov     w19, w2                 // w19 = previous step
+
+        mov     w0, w19
+        bl      get_elapsed_time        // Sets w0, w1
+
+        ldr     w2, =US_PER_STEP
+        cmp     w0, w2                         // Check if we should move square
+        b.lt    advance_square_maybe__end
+
+        // Enough time has passed since last step
+        mov     w19, w1                         // Set last step as current time
+        add     x20, x20, x3                    // Advance square position by its size
+
+        ldr     x0, =SCREEN_WIDTH
+        sub     x0, x0, x3
+        cmp     x20, x0                         // Check if square is horizontally out of bounds
+        b.lt    advance_square_maybe__end
+
+        // Square is at end of row
+        mov     x20, 0                          // Set square at beginning of row
+        add     x21, x21, x3                    // Move square one row up
+
+
+        ldr     x0, =SCREEN_HEIGH
+        sub     x0, x0, x3
+        cmp     x21, x0                         // Check if square is vertically out of bounds
+        b.lt    advance_square_maybe__end
+
+        // Square is vertically out of bounds
+        mov     x21, 0                          // Set square at bottom row
+
+advance_square_maybe__end:
+        mov     x0, x20
+        mov     x1, x21
+        mov     w2, w19
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
         ret
 
