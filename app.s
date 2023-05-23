@@ -4,14 +4,22 @@
 	.equ BYTES_PER_PIXEL, 4
 	.equ BYTES_PER_PIXEL_SHIFT, 2
 
-	.equ GPIO_BASE,    0x3f200000
-	.equ GPIO_GPFSEL0, 0x00
-	.equ GPIO_GPLEV0,  0x34
-        .equ GPIO_W,            0b000010        // (GPIO_1)
-        .equ GPIO_A,            0b000100        // (GPIO_2)
-        .equ GPIO_S,            0b001000        // (GPIO_3)
-        .equ GPIO_D,            0b010000        // (GPIO_4)
-        .equ GPIO_SPACE,        0b100000        // (GPIO_5)
+	.equ GPIO_BASE,                 0x3f200000
+	.equ GPIO_GPFSEL0,              0x00
+	.equ GPIO_GPLEV0,               0x34
+        .equ GPIO_W,                    0b000010        // (GPIO_1)
+        .equ GPIO_A,                    0b000100        // (GPIO_2)
+        .equ GPIO_S,                    0b001000        // (GPIO_3)
+        .equ GPIO_D,                    0b010000        // (GPIO_4)
+        .equ GPIO_SPACE,                0b100000        // (GPIO_5)
+        .equ RNG_BASE,                  0x3f104000
+        .equ RNG_NUMBER_ADDRESS,        0x3f104008
+        .equ SYS_TIMER_BASE_ADDRESS,    0x3f003000
+        .equ SYS_TIMER_VALUE_ADDRESS,   0x3f003004      // 32 bit number in microseconds
+        // .equ GPIO_CLK_DIV_ADDRESS,      0x3f101074
+        // .equ GPIO_CLK_CTL_ADDRESS,      0x3f101070
+        // .equ GPIO_CLK_DIV,              0x5A0C0000
+        // .equ GPIO_CLK_CTL,              0x5A000011
 
         BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x00F0000F
         BG_COLOR: .dword 0xFFFFFFFF
