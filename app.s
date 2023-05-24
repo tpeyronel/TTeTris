@@ -4,6 +4,20 @@
 	.equ BYTES_PER_PIXEL, 4
 	.equ BYTES_PER_PIXEL_SHIFT, 2
 
+
+        .equ BOARD_WIDTH,               10
+        .equ BOARD_HEIGHT,              22
+        .equ BOARD_SIZE,                BOARD_WIDTH * BOARD_HEIGHT
+        .equ BOARD_SIZE_IN_BYTES,       BOARD_SIZE * 1
+
+        .equ TETROMINO_BOARD_WIDTH,             4
+        .equ TETROMINO_BOARD_SIZE,              TETROMINO_BOARD_WIDTH * TETROMINO_BOARD_WIDTH
+        .equ TETROMINO_BOARD_SIZE_IN_BYTES,     TETROMINO_BOARD_SIZE * 1
+        .equ NUM_ORIENTATIONS,                  4
+
+        .equ NUM_TETROMINOS,                    4
+
+
 	.equ GPIO_BASE,                 0x3f200000
 	.equ GPIO_GPFSEL0,              0x00
 	.equ GPIO_GPLEV0,               0x34
@@ -29,6 +43,129 @@
 
 	.globl main
 
+/* struct GameState */
+        .equ CURRENT_TETROMINO,         0                                            // struct TetrominoState
+        .equ BOARD_STATE,               CURRENT_TETROMINO + STRUCT_TSTATE_SIZE       // u8[22][10]
+
+        .equ STRUCT_GAME_STATE_SIZE,    BOARD_STATE + BOARD_SIZE_IN_BYTES
+
+/* struct TetrominoState */
+        .equ TSTATE_ID,                 0                       // u64
+        .equ TSTATE_POS_X,              TSTATE_ID + 8           // i64
+        .equ TSTATE_POS_Y,              TSTATE_POS_X + 8        // i64
+        .equ TSTATE_ROT,                TSTATE_POS_Y + 8        // u64
+
+        .equ STRUCT_TSTATE_SIZE,        TSTATE_ROT + 8
+
+/* struct Tetromino */
+        .equ TETROMINO_COLOR,           0                           // u32
+        .equ TETROMINO_DATAS,           TETROMINO_COLOR + 4         // struct TetrominoData[4]
+
+        .equ STUCT_TETROMINO_SIZE,      TETROMINO_DATAS + (TDATA_SIZE * NUM_ORIENTATIONS)
+
+/* struct TetrominoData */
+        .equ TDATA,                     0                       // u8[4][4]             [0][0] is bottom left, [0][3] is bottom right
+
+        .equ TDATA_SIZE,                TDATA + TETROMINO_BOARD_SIZE_IN_BYTES
+
+
+/* Data for all 7 tetrominos */
+TETROMINOS:
+/* Tetromino I: */
+        .word 0x31C7EF  // Color
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x01010101
+        .word 0x00000000
+
+        .word 0x00010000
+        .word 0x00010000
+        .word 0x00010000
+        .word 0x00010000
+
+        .word 0x00000000
+        .word 0x01010101
+        .word 0x00000000
+        .word 0x00000000
+
+        .word 0x00000100
+        .word 0x00000100
+        .word 0x00000100
+        .word 0x00000100
+
+
+/* Tetromino J: */
+        .word 0x5A65AD  // Color
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x01010100
+        .word 0x01000000
+
+        .word 0x00000000
+        .word 0x01010000
+        .word 0x00010000
+        .word 0x00010000
+
+        .word 0x00000000
+        .word 0x00000100
+        .word 0x01010100
+        .word 0x00000000
+
+        .word 0x00000000
+        .word 0x00010000
+        .word 0x00010000
+        .word 0x00010100
+
+/* Tetromino L: */
+        .word 0xEF7921  // Color
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x01010100
+        .word 0x00000100
+
+        .word 0x00000000
+        .word 0x00010000
+        .word 0x00010000
+        .word 0x01010000
+
+        .word 0x00000000
+        .word 0x01000000
+        .word 0x01010100
+        .word 0x00000000
+
+        .word 0x00000000
+        .word 0x00010100
+        .word 0x00010000
+        .word 0x00010000
+
+/* Tetromino O: */
+        .word 0xF7D308  // Color
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x00010100
+        .word 0x00010100
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x00010100
+        .word 0x00010100
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x00010100
+        .word 0x00010100
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x00010100
+        .word 0x00010100
+
+
+
 /*
  * x19: framebuffer address (could be x9-15 ?)
  * x20: player x
@@ -42,6 +179,8 @@
  */
 main:
 	mov     x28, x0         // Save framebuffer address to x28
+
+        ldr     x0, =TETROMINOS
 
         mov     x20, #320               // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
         mov     x21, #240               // Player y coordinate         (right) 1 <= x <= SCREEN_WIDTH (left)
@@ -500,6 +639,7 @@ draw_filled_square:
 
         mov     w5, w4
         mov     x4, x3
+        sub     x2, x2, 1       // Top right (x', y') = (x + size - 1, y + size - 1)
         add     x3, x1, x2
         add     x2, x0, x2
         bl      draw_filled_rectangle
@@ -547,7 +687,7 @@ advance_square_maybe:
         stp     x20, x21, [sp, 16]
 
         mov     x20, x0                 // x20 = x coordinate
-        mov     x21, x1                 // x21 = x coordinate
+        mov     x21, x1                 // x21 = y coordinate
         mov     w19, w2                 // w19 = previous step
 
         mov     w0, w19
