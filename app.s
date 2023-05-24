@@ -243,53 +243,6 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         mov     x21, x1
         mov     x22, x2
 
-
-        mov     x0, x22         // x0 = bg color index
-        bl      index_bg_color
-        mov     w23, w0
-
-        mov     x0, x20
-        mov     x1, x21
-        mov     x2, x28
-        mov     x3, 100
-        mov     w4, w24
-        bl      draw_circle_at
-
-
-        mov     x0, 80
-        mov     x1, 100
-        mov     x2, 400
-        mov     x3, 300
-        mov     x4, x28
-        mov     w5, w24
-        bl      draw_filled_rectangle
-
-
-        mov     x0, 400
-        mov     x1, 350
-        mov     x2, 100
-        mov     x3, x28
-        mov     w4, w24
-        bl      draw_filled_square
-
-
-        mov     x0, x10
-        mov     x1, x11
-        mov     w2, w13
-        mov     x3, x12
-        bl      advance_square_maybe
-        mov     x10, x0
-        mov     x11, x1
-        mov     w13, w2
-
-
-        mov     x0, x10
-        mov     x1, x11
-        mov     x2, x12
-        mov     x3, x28
-        mov     w4, w24
-        bl      draw_filled_square
-
 redraw:
         b draw_screen
 
@@ -450,24 +403,6 @@ handle_space:
         csel    x3, x3, xzr, lt         // Set x3 to zero if equal to 6
 
 end_handle_space:
-        ldp     lr, x19, [sp], 16
-        ret
-
-
-/*
- * Params:
- *      x0: background color index
- * Returns:
- *      w0: background color
- */
-index_bg_color:
-        stp     lr, x19, [sp, -16]!
-
-        lsl     x0, x0, 2       // x0 = i * 4
-        ldr     x19, =BG_COLORS // x19 = &BG_COLORS[0]
-        add     x0, x19, x0     // x0 = &BG_COLORS[0] + (i * 4) = &BG_COLORS[i]
-        ldr     w0, [x0]        // w0 = BG_COLORS[i]
-
         ldp     lr, x19, [sp], 16
         ret
 
@@ -668,63 +603,3 @@ get_elapsed_time:
         ldr     w1, [x1]
         sub     w0, w1, w0
         ret
-
-
-
-/*
- * Params:
- *      x0: square x coordinate
- *      x1: square y coordinate
- *      w2: previous step
- *      x3: square size
- * Returns:
- *      x0: new square x coordinate
- *      x1: new square y coordinate
- *      w2: previous or new step
- */
-advance_square_maybe:
-        stp     lr, x19, [sp, -32]!
-        stp     x20, x21, [sp, 16]
-
-        mov     x20, x0                 // x20 = x coordinate
-        mov     x21, x1                 // x21 = y coordinate
-        mov     w19, w2                 // w19 = previous step
-
-        mov     w0, w19
-        bl      get_elapsed_time        // Sets w0, w1
-
-        ldr     w2, =US_PER_STEP
-        cmp     w0, w2                         // Check if we should move square
-        b.lt    advance_square_maybe__end
-
-        // Enough time has passed since last step
-        mov     w19, w1                         // Set last step as current time
-        add     x20, x20, x3                    // Advance square position by its size
-
-        ldr     x0, =SCREEN_WIDTH
-        sub     x0, x0, x3
-        cmp     x20, x0                         // Check if square is horizontally out of bounds
-        b.lt    advance_square_maybe__end
-
-        // Square is at end of row
-        mov     x20, 0                          // Set square at beginning of row
-        add     x21, x21, x3                    // Move square one row up
-
-
-        ldr     x0, =SCREEN_HEIGH
-        sub     x0, x0, x3
-        cmp     x21, x0                         // Check if square is vertically out of bounds
-        b.lt    advance_square_maybe__end
-
-        // Square is vertically out of bounds
-        mov     x21, 0                          // Set square at bottom row
-
-advance_square_maybe__end:
-        mov     x0, x20
-        mov     x1, x21
-        mov     w2, w19
-
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 32
-        ret
-
