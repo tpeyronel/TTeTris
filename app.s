@@ -775,10 +775,10 @@ advance_square_maybe__end:
 
 /*
  * Params:
- *      x0: bottom left x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
- *      x1: bottom left y coordinate       (bottom) 0 <= y < SCREEN_HEIGHT (top)
- *      x2: top right x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
- *      x3: top right y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x0: first point x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: first point y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: second point x coordinate       (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x3: second point y coordinate     (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      x4: beginning of framebuffer
  *      w5: color
  */
@@ -789,9 +789,34 @@ draw_line:
         stp     x11, x12, [sp, 48]
         stp     x22, x23, [sp, 64]
 
-        // TODO: check bounds?
+        bl draw_line_low_slope
+
+        ldp     x22, x23, [sp, 64]
+        ldp     x11, x12, [sp, 48]
+        ldp     x9, x10, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
+        ret
+
+
+/*
+ * Params:
+ *      x0: left point x coordinate            (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: left point y coordinate          (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: right point x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x3: right point y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x4: beginning of framebuffer
+ *      w5: color
+ */
+draw_line_low_slope:
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+        stp     x26, x27, [sp, 64]
 
         // Convert game y coordinates to screen y coordinates
+        // TODO: move this logic higher
         mov     x19, (SCREEN_HEIGH - 1)
         sub     x1, x19, x1
         sub     x3, x19, x3
@@ -804,55 +829,53 @@ draw_line:
 
 
 
-        sub     x19, x2, x0     // x19 = dx
-        sub     x20, x3, x1     // x20 = dy
-        mov     x22, 1          // x22 = yi = 1 (assume dy >= 0)
-        mov     x12, SCREEN_WIDTH
-        lsl     x12, x12, BYTES_PER_PIXEL_SHIFT // x12 = offset in bytes between two consecutive rows
+        sub     x19, x2, x0                     // x19 = dx = x1 - x0
+        sub     x20, x3, x1                     // x20 = dy = y1 - y0
+        mov     x22, 1                          // x22 = yi = 1 (assume dy >= 0)
+        mov     x23, SCREEN_WIDTH
+        lsl     x23, x23, BYTES_PER_PIXEL_SHIFT // x23 = "fi" = offset in bytes between two consecutive rows
 
 
-        cmp     x20, 0                  // dy < 0 ?
-        b.ge    draw_line__nneg_dy      // continue if dy >= 0
-        sub     x20, xzr, x20           // dy = -dy
-        sub     x22, xzr, x22           // yi = -1
-        sub     x12, xzr, x12           // flip framebuffer row increment direction
-draw_line__nneg_dy:
+        cmp     x20, 0                          // dy < 0 ?
+        b.ge    draw_line_low_slope__nneg_dy    // continue if dy >= 0
+        sub     x20, xzr, x20                   // dy = -dy
+        sub     x22, xzr, x22                   // yi = -yi TODO: remove? (unused)
+        sub     x23, xzr, x23                   // fi = -fi
+draw_line_low_slope__nneg_dy:
 
 
         lsl     x21, x20, 1     // x21 = 2*dy
         sub     x21, x21, x19   // x21 = 2*dy - dx = D
 
-        lsl     x9, x19, 1      // x9 = 2*dx
-        lsl     x6, x20, 1      // x6 = 2*dy
+        lsl     x24, x19, 1      // x24 = 2*dx
+        lsl     x25, x20, 1      // x25 = 2*dy
 
-        mov     x10, x0         // x10 = x
-        mov     x11, x1         // x11 = y
-
-
-draw_line__next_col:
-        /* paint pixel at (x,y) */
-        str     w5, [x4]
-        add     x4, x4, BYTES_PER_PIXEL // Move framebuffer one pixel right
-
-        cmp     x21, 0                  // D > 0 ?
-        b.le    draw_line__same_y       // D <= 0 => don't advance to next row
-        add     x11, x11, x22           // y = y + yi
-        sub     x21, x21, x9            // D = D - 2*dx
-        add     x4, x4, x12             // Move framebuffer by one row
+        mov     x26, x0         // x26 = x
+        mov     x27, x1         // x27 = y (unused)
 
 
-draw_line__same_y:
+draw_line_low_slope__next_col:
+        str     w5, [x4]                        // Paint pixel at (x,y)
+        add     x4, x4, BYTES_PER_PIXEL         // Move framebuffer one pixel right
 
-        add     x21, x21, x6
-        add     x10, x10, 1             // x = x + 1
-        cmp     x10, x2                 // x <= x1?
-        b.le    draw_line__next_col
+        cmp     x21, 0                          // D > 0 ?
+        b.le    draw_line_low_slope__keep_y     // if D <= 0 then stay in the same row
+        add     x27, x27, x22                   // y = y + yi
+        sub     x21, x21, x24                   // D = D - 2*dx
+        add     x4, x4, x23                     // f = f + fi   move framebuffer by fi (+/- one row)
+draw_line_low_slope__keep_y:
+
+        add     x21, x21, x25           // D = D + 2*dy
+        add     x26, x26, 1             // x = x + 1
+        // Check if we finished drawing line
+        cmp     x26, x2                 // x <= x1?
+        b.le    draw_line_low_slope__next_col
 
 
 
-        ldp     x22, x23, [sp, 64]
-        ldp     x11, x12, [sp, 48]
-        ldp     x9, x10, [sp, 32]
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 80
         ret
