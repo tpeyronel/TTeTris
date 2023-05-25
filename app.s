@@ -16,7 +16,7 @@
         .equ TETROMINO_BOARD_SIZE_IN_BYTES,     TETROMINO_BOARD_SIZE * 1
         .equ NUM_ORIENTATIONS,                  4
 
-        .equ NUM_TETROMINOS,                    4
+        .equ NUM_TETROMINOS,                    7
 
 
 	.equ GPIO_BASE,                 0x3f200000
@@ -171,6 +171,75 @@ TETROMINOS:
         .word 0x00000000
         .word 0x00010100
         .word 0x00010100
+
+/* Tetromino S: */
+        .word 0x42B642  // Color
+
+        .word 0x00 00 00 00
+        .word 0x00 00 00 00
+        .word 0x01 01 00 00
+        .word 0x00 01 01 00
+
+        .word 0x00 00 00 00
+        .word 0x00 01 00 00
+        .word 0x01 01 00 00
+        .word 0x01 00 00 00
+
+        .word 0x00 00 00 00
+        .word 0x01 01 00 00
+        .word 0x00 01 01 00
+        .word 0x00 00 00 00
+
+        .word 0x00 00 00 00
+        .word 0x00 00 01 00
+        .word 0x00 01 01 00
+        .word 0x00 01 00 00
+
+/* Tetromino Z: */
+        .word 0xEF2029  // Color
+
+        .word 0x00 00 00 00
+        .word 0x00 00 00 00
+        .word 0x00 01 01 00
+        .word 0x01 01 00 00
+
+        .word 0x00 00 00 00
+        .word 0x01 00 00 00
+        .word 0x01 01 00 00
+        .word 0x00 01 00 00
+
+        .word 0x00 00 00 00
+        .word 0x00 01 01 00
+        .word 0x01 01 00 00
+        .word 0x00 00 00 00
+
+        .word 0x00 00 00 00
+        .word 0x00 01 00 00
+        .word 0x00 01 01 00
+        .word 0x00 00 01 00
+
+/* Tetromino T: */
+        .word 0xAD4D9C  // Color
+
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x01010100
+        .word 0x00010000
+
+        .word 0x00000000
+        .word 0x00010000
+        .word 0x01010000
+        .word 0x00010000
+
+        .word 0x00000000
+        .word 0x00010000
+        .word 0x01010100
+        .word 0x00000000
+
+        .word 0x00000000
+        .word 0x00010000
+        .word 0x00010100
+        .word 0x00010000
 
 
 
