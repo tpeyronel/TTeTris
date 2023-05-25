@@ -310,7 +310,7 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
         mov     x4, x28
         mov     w5, 0xFFFF00
-        bl      draw_line_high_slope
+        bl      draw_line
 
         b game_loop
 
@@ -784,19 +784,77 @@ advance_square_maybe__end:
  *      w5: color
  */
 draw_line:
-        stp     lr, x19, [sp, -80]!
+        stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
-        stp     x9, x10, [sp, 32]
-        stp     x11, x12, [sp, 48]
-        stp     x22, x23, [sp, 64]
 
-        bl draw_line_low_slope
+        // TODO: implement hor. line and ver. line subroutines?
 
-        ldp     x22, x23, [sp, 64]
-        ldp     x11, x12, [sp, 48]
-        ldp     x9, x10, [sp, 32]
+        // Convert game y coordinates to screen y coordinates
+        mov     x19, (SCREEN_HEIGH - 1)
+        sub     x1, x19, x1
+        sub     x3, x19, x3
+
+
+        subs    x19, x2, x0                     // x19 = dx = x1 - x0
+        b.ge    draw_line__end_abs_dx
+        sub     x19, xzr, x19                   // dx = -dx
+draw_line__end_abs_dx:
+        /* x19 = |x1 - x0| = |dx| */
+
+
+        subs    x20, x3, x1                     // x20 = dy = y1 - y0
+        b.ge    draw_line__end_abs_dy
+        sub     x20, xzr, x20                   // dy = -dy
+draw_line__end_abs_dy:
+        /* x20 = |y1 - y0| = |dy| */
+
+
+        cmp     x20, x19                  // (|y1 - y0| < |x1 - x0|)?  (is line low slope?)
+        b.le    draw_line__case_low_slope
+        b.gt    draw_line__case_high_slope
+
+
+
+draw_line__case_low_slope:
+        cmp     x0, x2          // x0 <= x1 ?
+        b.gt    draw_line__case_low_slope_invert
+
+        bl      draw_line_low_slope
+        b       draw_line__end
+
+draw_line__case_low_slope_invert:
+        mov     x19, x0
+        mov     x0, x2
+        mov     x2, x19
+        mov     x19, x1
+        mov     x1, x3
+        mov     x3, x19
+        bl      draw_line_low_slope
+        b       draw_line__end
+
+
+
+draw_line__case_high_slope:
+        cmp     x1, x3          // y0 <= y1 ?
+        b.gt    draw_line__case_high_slope_invert
+
+        bl      draw_line_high_slope
+        b       draw_line__end
+
+draw_line__case_high_slope_invert:
+        mov     x19, x0
+        mov     x0, x2
+        mov     x2, x19
+        mov     x19, x1
+        mov     x1, x3
+        mov     x3, x19
+        bl      draw_line_high_slope
+        b       draw_line__end
+
+
+draw_line__end:
         ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 80
+        ldp     lr, x19, [sp], 32
         ret
 
 
@@ -816,11 +874,6 @@ draw_line_low_slope:
         stp     x24, x25, [sp, 48]
         stp     x26, x27, [sp, 64]
 
-        // Convert game y coordinates to screen y coordinates
-        // TODO: move this logic higher
-        mov     x19, (SCREEN_HEIGH - 1)
-        sub     x1, x19, x1
-        sub     x3, x19, x3
 
         mov     x19, SCREEN_WIDTH               // x19 = screen width
         mul     x19, x19, x1                    // x19 = initial vertical offset
