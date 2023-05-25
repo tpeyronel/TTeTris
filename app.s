@@ -260,12 +260,12 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         /* Finished drawing background */
 
 
-        ldr     x0, [sp, (TETROMINO_STATE + TSTATE_POS_X)]
-        ldr     x1, [sp, (TETROMINO_STATE + TSTATE_POS_Y)]
-        mov     x2, x28
-        mov     x3, 100
-        mov     w4, w24
-        bl      draw_circle_at
+        // ldr     x0, [sp, (TETROMINO_STATE + TSTATE_POS_X)]
+        // ldr     x1, [sp, (TETROMINO_STATE + TSTATE_POS_Y)]
+        // mov     x2, x28
+        // mov     x3, 100
+        // mov     w4, w24
+        // bl      draw_circle_at
 
 
         // mov     x0, 80
@@ -301,6 +301,15 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         mov     x3, x28
         mov     w4, w24
         bl      draw_filled_square
+
+
+        mov     x0, (SCREEN_WIDTH / 2)
+        mov     x1, (SCREEN_HEIGH / 2)
+        ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
+        ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
+        mov     x4, x28
+        mov     w5, 0xFFFF00
+        bl      draw_line
 
         b game_loop
 
@@ -363,7 +372,7 @@ process_input:
         mov     x19, x0         // x19 = const struct InputState*
         mov     x20, x1         // x20 = mut struct TetrominoState*
 
-        ldr     w0, [x19, ON_PRESS_STATE]
+        ldr     w0, [x19, PRESSED_STATE]
         mov     x1, x20
 
         bl      handle_w
@@ -762,3 +771,88 @@ advance_square_maybe__end:
         ldp     lr, x19, [sp], 32
         ret
 
+
+
+/*
+ * Params:
+ *      x0: bottom left x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: bottom left y coordinate       (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: top right x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x3: top right y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x4: beginning of framebuffer
+ *      w5: color
+ */
+draw_line:
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x9, x10, [sp, 32]
+        stp     x11, x12, [sp, 48]
+        stp     x22, x23, [sp, 64]
+
+        // TODO: check bounds?
+
+        // Convert game y coordinates to screen y coordinates
+        mov     x19, (SCREEN_HEIGH - 1)
+        sub     x1, x19, x1
+        sub     x3, x19, x3
+
+        mov     x19, SCREEN_WIDTH               // x19 = screen width
+        mul     x19, x19, x1                    // x19 = initial vertical offset
+        add     x19, x19, x0                    // x19 = initial vertical offset + initial horizontal offset
+        lsl     x19, x19, BYTES_PER_PIXEL_SHIFT // x19 = total offset
+        add     x4, x4, x19                     // x4 = &framebuffer['line's leftmost pixel']
+
+
+
+        sub     x19, x2, x0     // x19 = dx
+        sub     x20, x3, x1     // x20 = dy
+        mov     x22, 1          // x22 = yi = 1 (assume dy >= 0)
+        mov     x12, SCREEN_WIDTH
+        lsl     x12, x12, BYTES_PER_PIXEL_SHIFT // x12 = offset in bytes between two consecutive rows
+
+
+        cmp     x20, 0                  // dy < 0 ?
+        b.ge    draw_line__nneg_dy      // continue if dy >= 0
+        sub     x20, xzr, x20           // dy = -dy
+        sub     x22, xzr, x22           // yi = -1
+        sub     x12, xzr, x12           // flip framebuffer row increment direction
+draw_line__nneg_dy:
+
+
+        lsl     x21, x20, 1     // x21 = 2*dy
+        sub     x21, x21, x19   // x21 = 2*dy - dx = D
+
+        lsl     x9, x19, 1      // x9 = 2*dx
+        lsl     x6, x20, 1      // x6 = 2*dy
+
+        mov     x10, x0         // x10 = x
+        mov     x11, x1         // x11 = y
+
+
+draw_line__next_col:
+        /* paint pixel at (x,y) */
+        str     w5, [x4]
+        add     x4, x4, BYTES_PER_PIXEL // Move framebuffer one pixel right
+
+        cmp     x21, 0                  // D > 0 ?
+        b.le    draw_line__same_y       // D <= 0 => don't advance to next row
+        add     x11, x11, x22           // y = y + yi
+        sub     x21, x21, x9            // D = D - 2*dx
+        add     x4, x4, x12             // Move framebuffer by one row
+
+
+draw_line__same_y:
+
+        add     x21, x21, x6
+        add     x10, x10, 1             // x = x + 1
+        cmp     x10, x2                 // x <= x1?
+        b.le    draw_line__next_col
+
+
+
+        ldp     x22, x23, [sp, 64]
+        ldp     x11, x12, [sp, 48]
+        ldp     x9, x10, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
+        ret
