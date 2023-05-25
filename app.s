@@ -5,6 +5,7 @@
 	.equ BYTES_PER_PIXEL_SHIFT, 2
         .equ BYTES_PER_SCREEN_ROW, SCREEN_WIDTH * BYTES_PER_PIXEL
 
+        .equ MOVEMENT_PER_STEP,         64
 
         .equ BOARD_WIDTH,               10
         .equ BOARD_HEIGHT,              22
@@ -442,7 +443,7 @@ process_input:
         mov     x19, x0         // x19 = const struct InputState*
         mov     x20, x1         // x20 = mut struct TetrominoState*
 
-        ldr     w0, [x19, PRESSED_STATE]
+        ldr     w0, [x19, ON_PRESS_STATE]
         mov     x1, x20
 
         bl      handle_w
@@ -470,7 +471,7 @@ handle_w:
         cmp     x19, (SCREEN_HEIGH - 1)   // Check if player is touching top edge
         b.eq    handle_w__end
 
-        add     x19, x19, 1               // Move player one position up
+        add     x19, x19, MOVEMENT_PER_STEP     // Move player one position up
         str     x19, [x1, TSTATE_POS_Y]
 
 handle_w__end:
@@ -492,7 +493,7 @@ handle_s:
         cmp     x19, 0                   // Check if player is touching bottom edge
         b.eq    handle_s__end
 
-        sub     x19, x19, 1               // Move player one position down
+        sub     x19, x19, MOVEMENT_PER_STEP     // Move player one position down
         str     x19, [x1, TSTATE_POS_Y]
 
 handle_s__end:
@@ -514,7 +515,7 @@ handle_a:
         cmp     x19, 0                          // Check if player is touching left edge
         b.eq    handle_a__end
 
-        sub     x19, x19, 1                     // Move player one position left
+        sub     x19, x19, MOVEMENT_PER_STEP     // Move player one position left
         str     x19, [x1, TSTATE_POS_X]
 
 handle_a__end:
@@ -536,7 +537,7 @@ handle_d:
         cmp     x19, (SCREEN_WIDTH - 1)         // Check if player is touching right edge
         b.eq    handle_d__end
 
-        add     x19, x19, 1                     // Move player one position right
+        add     x19, x19, MOVEMENT_PER_STEP     // Move player one position right
         str     x19, [x1, TSTATE_POS_X]
 
 handle_d__end:
