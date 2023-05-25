@@ -175,48 +175,48 @@ TETROMINOS:
 /* Tetromino S: */
         .word 0x42B642  // Color
 
-        .word 0x00 00 00 00
-        .word 0x00 00 00 00
-        .word 0x01 01 00 00
-        .word 0x00 01 01 00
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x01010000
+        .word 0x00010100
 
-        .word 0x00 00 00 00
-        .word 0x00 01 00 00
-        .word 0x01 01 00 00
-        .word 0x01 00 00 00
+        .word 0x00000000
+        .word 0x00010000
+        .word 0x01010000
+        .word 0x01000000
 
-        .word 0x00 00 00 00
-        .word 0x01 01 00 00
-        .word 0x00 01 01 00
-        .word 0x00 00 00 00
+        .word 0x00000000
+        .word 0x01010000
+        .word 0x00010100
+        .word 0x00000000
 
-        .word 0x00 00 00 00
-        .word 0x00 00 01 00
-        .word 0x00 01 01 00
-        .word 0x00 01 00 00
+        .word 0x00000000
+        .word 0x00000100
+        .word 0x00010100
+        .word 0x00010000
 
 /* Tetromino Z: */
         .word 0xEF2029  // Color
 
-        .word 0x00 00 00 00
-        .word 0x00 00 00 00
-        .word 0x00 01 01 00
-        .word 0x01 01 00 00
+        .word 0x00000000
+        .word 0x00000000
+        .word 0x00010100
+        .word 0x01010000
 
-        .word 0x00 00 00 00
-        .word 0x01 00 00 00
-        .word 0x01 01 00 00
-        .word 0x00 01 00 00
+        .word 0x00000000
+        .word 0x01000000
+        .word 0x01010000
+        .word 0x00010000
 
-        .word 0x00 00 00 00
-        .word 0x00 01 01 00
-        .word 0x01 01 00 00
-        .word 0x00 00 00 00
+        .word 0x00000000
+        .word 0x00010100
+        .word 0x01010000
+        .word 0x00000000
 
-        .word 0x00 00 00 00
-        .word 0x00 01 00 00
-        .word 0x00 01 01 00
-        .word 0x00 00 01 00
+        .word 0x00000000
+        .word 0x00010000
+        .word 0x00010100
+        .word 0x00000100
 
 /* Tetromino T: */
         .word 0xAD4D9C  // Color
