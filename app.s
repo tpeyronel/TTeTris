@@ -44,10 +44,17 @@
 	.globl main
 
 /* struct GameState */
-        .equ CURRENT_TETROMINO,         0                                            // struct TetrominoState
-        .equ BOARD_STATE,               CURRENT_TETROMINO + STRUCT_TSTATE_SIZE       // u8[22][10]
+        .equ INPUT_STATE,               0                                       // struct InputState
+        .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE   // struct TetrominoState
+        .equ BOARD_STATE,               TETROMINO_STATE + STRUCT_TSTATE_SIZE    // u8[22][10]
 
         .equ STRUCT_GAME_STATE_SIZE,    BOARD_STATE + BOARD_SIZE_IN_BYTES
+
+/* struct InputState */
+        .equ PRESSED_STATE,             0                       // u32
+        .equ ON_PRESS_STATE,            PRESSED_STATE + 4       // u32
+
+        .equ STRUCT_INPUT_STATE_SIZE,   ON_PRESS_STATE + 4
 
 /* struct TetrominoState */
         .equ TSTATE_ID,                 0                       // u64
@@ -180,6 +187,17 @@ TETROMINOS:
 main:
 	mov     x28, x0         // Save framebuffer address to x28
 
+
+        // Allocate struct GameState
+        sub     sp, sp, STRUCT_GAME_STATE_SIZE
+        // TODO: implement init_game_state subroutine
+        add     x0, sp, INPUT_STATE
+        bl      init_input_state
+        add     x0, sp, TETROMINO_STATE
+        bl      init_tetromino_state
+
+
+
         ldr     x0, =TETROMINOS
 
         mov     x20, #320               // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
@@ -197,13 +215,24 @@ main:
 	// Ejemplo de uso de gpios
 	mov     x9, GPIO_BASE
 
-	// Atención: se utilizan registros w porque la documentación de broadcom
-	// indica que los registros que estamos leyendo y escribiendo son de 32 bits
-
 	// Setea gpios 0 - 9 como lectura
 	str     wzr, [x9, GPIO_GPFSEL0]
 
-draw_screen:
+game_loop:
+
+        add     x0, sp, INPUT_STATE
+        bl      read_input
+
+        add     x0, sp, INPUT_STATE
+        add     x1, sp, TETROMINO_STATE
+        bl      process_input
+
+        ldr     x0, [sp, TETROMINO_STATE + TSTATE_ID]
+        bl      index_bg_color
+        mov     w23, w0
+
+
+        /* Draw background */
         mov     x19, x28                // Set x19 to beginning of framebuffer
 	mov     x26, SCREEN_HEIGH       // Set x21 to remaining rows
 next_row:
@@ -228,49 +257,32 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 
 	sub     x26, x26, 1             // Decrement remaining rows
 	cbnz    x26, next_row           // If not at last row, draw next row
-
-	// And bit a bit mantiene el resultado del bit 2 en w10 (notar 0b... es binario)
-	// al inmediato se lo refiere como "máscara" en este caso:
-	// - Al hacer AND revela el estado del bit 2
-	// - Al hacer OR "setea" el bit 2 en 1
-	// - Al hacer AND con el complemento "limpia" el bit 2 (setea el bit 2 en 0)
-
-        mov     x0, x20         // x0 = player x
-        mov     x1, x21         // x1 = player y
-        mov     x2, x22         // x2 = bg color index
-        bl      handle_input
-        mov     x20, x0
-        mov     x21, x1
-        mov     x22, x2
+        /* Finished drawing background */
 
 
-        mov     x0, x22         // x0 = bg color index
-        bl      index_bg_color
-        mov     w23, w0
-
-        mov     x0, x20
-        mov     x1, x21
+        ldr     x0, [sp, (TETROMINO_STATE + TSTATE_POS_X)]
+        ldr     x1, [sp, (TETROMINO_STATE + TSTATE_POS_Y)]
         mov     x2, x28
         mov     x3, 100
         mov     w4, w24
         bl      draw_circle_at
 
 
-        mov     x0, 80
-        mov     x1, 100
-        mov     x2, 400
-        mov     x3, 300
-        mov     x4, x28
-        mov     w5, w24
-        bl      draw_filled_rectangle
+        // mov     x0, 80
+        // mov     x1, 100
+        // mov     x2, 400
+        // mov     x3, 300
+        // mov     x4, x28
+        // mov     w5, w24
+        // bl      draw_filled_rectangle
 
 
-        mov     x0, 400
-        mov     x1, 350
-        mov     x2, 100
-        mov     x3, x28
-        mov     w4, w24
-        bl      draw_filled_square
+        // mov     x0, 400
+        // mov     x1, 350
+        // mov     x2, 100
+        // mov     x3, x28
+        // mov     w4, w24
+        // bl      draw_filled_square
 
 
         mov     x0, x10
@@ -290,31 +302,69 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         mov     w4, w24
         bl      draw_filled_square
 
-redraw:
-        b draw_screen
+        b game_loop
+
+/*
+ * Params:
+ *      x0: mut struct InputState*
+ */
+init_input_state:
+        stur    wzr, [x0, PRESSED_STATE]
+        stur    wzr, [x0, ON_PRESS_STATE]
+        ret
+
+/*
+ * Params:
+ *      x0: mut struct TetrominoState*
+ */
+init_tetromino_state:
+        stur    xzr, [x0, TSTATE_ID]
+        mov     x9, (SCREEN_WIDTH / 2)
+        stur    x9, [x0, TSTATE_POS_X]
+        mov     x9, (SCREEN_HEIGH / 2)
+        stur    x9, [x0, TSTATE_POS_Y]
+        stur    xzr, [x0, TSTATE_ROT]
+        ret
 
 
 /*
  * Params:
- *      x0: player x position
- *      x1: player y position
- *      x2: background color index
- * Returns:
- *      x0: modified player x position
- *      x1: modified player y position
- *      x2: modified background color index
+ *      x0: mut struct InputState*
  */
-handle_input:
-        sub     sp, sp, 32
-        str     lr, [sp]
-        str     x19, [sp, 8]
-        str     x20, [sp, 16]
+read_input:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
 
-        mov     x22, x3         // Save x3
-        mov     x3, x2          // Use x3 as bg color index
+        ldr     w19, [x0, PRESSED_STATE]        // Save last pressed state to compute on press state
 
-	mov     x19, GPIO_BASE
-	ldr     w2, [x19, GPIO_GPLEV0]
+	mov     x20, GPIO_BASE
+	ldr     w20, [x20, GPIO_GPLEV0]         // w20 = new pressed state
+
+        // Input in bit 'n' is "on press" if current pressed state is 1 and previous pressed state is 0
+        mvn     w19, w19                        // Bitwise NOT last pressed state
+        and     w21, w20, w19                   // w21 = new on press state
+
+        str     w20, [x0, PRESSED_STATE]
+        str     w21, [x0, ON_PRESS_STATE]
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+/*
+ * Params:
+ *      x0: const struct InputState*
+ *      x1: mut struct TetrominoState*
+ */
+process_input:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x19, x0         // x19 = const struct InputState*
+        mov     x20, x1         // x20 = mut struct TetrominoState*
+
+        ldr     w0, [x19, ON_PRESS_STATE]
+        mov     x1, x20
 
         bl      handle_w
         bl      handle_a
@@ -322,134 +372,118 @@ handle_input:
         bl      handle_d
         bl      handle_space
 
-        mov     x2, x3          // Move bg color index back to x2
-        mov     x3, x22         // Restore x3
-
-        ldr     x20, [sp, 16]
-        ldr     x19, [sp, 8]
-        ldr     lr, [sp]
-        add     sp, sp, 32
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
         ret
 
 /*
  * Params:
- *      x0: player x position
- *      x1: player y position
- *      x2: GPIO_GPLEV0 flags
- * Returns:
- *      x0: modified player x position
- *      x1: modified player y position
+ *      x0: u32 (on press flags)
+ *      x1: mut struct TetrominoState*
  */
 handle_w:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x2, GPIO_W
-        cbz     x19, end_handle_w
+	and     x19, x0, GPIO_W
+        cbz     x19, handle_w__end
 
-        cmp     x1, SCREEN_HEIGH        // Check if player is touching top edge
-        b.eq    end_handle_w
+        ldr     x19, [x1, TSTATE_POS_Y]
+        cmp     x19, (SCREEN_HEIGH - 1)   // Check if player is touching top edge
+        b.eq    handle_w__end
 
-        add     x1, x1, 1               // Move player one position up
+        add     x19, x19, 1               // Move player one position up
+        str     x19, [x1, TSTATE_POS_Y]
 
-end_handle_w:
+handle_w__end:
         ldp     lr, x19, [sp], 16
         ret
 
 /*
  * Params:
- *      x0: player x position
- *      x1: player y position
- *      x2: GPIO_GPLEV0 flags
- * Returns:
- *      x0: modified player x position
- *      x1: modified player y position
+ *      x0: u32 (on press flags)
+ *      x1: mut struct TetrominoState*
  */
 handle_s:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x2, GPIO_S
-        cbz     x19, end_handle_s
+	and     x19, x0, GPIO_S
+        cbz     x19, handle_s__end
 
-        cmp     x1, 1                   // Check if player is touching bottom edge
-        b.eq    end_handle_s
+        ldr     x19, [x1, TSTATE_POS_Y]
+        cmp     x19, 0                   // Check if player is touching bottom edge
+        b.eq    handle_s__end
 
-        sub     x1, x1, 1               // Move player one position down
+        sub     x19, x19, 1               // Move player one position down
+        str     x19, [x1, TSTATE_POS_Y]
 
-end_handle_s:
+handle_s__end:
         ldp     lr, x19, [sp], 16
         ret
 
 /*
  * Params:
- *      x0: player x position
- *      x1: player y position
- *      x2: GPIO_GPLEV0 flags
- * Returns:
- *      x0: modified player x position
- *      x1: modified player y position
+ *      x0: u32 (on press flags)
+ *      x1: mut struct TetrominoState*
  */
 handle_a:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x2, GPIO_A
-        cbz     x19, end_handle_a
+	and     x19, x0, GPIO_A
+        cbz     x19, handle_a__end
 
-        cmp     x0, SCREEN_WIDTH        // Check if player is touching left edge
-        b.eq    end_handle_a
+        ldr     x19, [x1, TSTATE_POS_X]
+        cmp     x19, 0                          // Check if player is touching left edge
+        b.eq    handle_a__end
 
-        add     x0, x0, 1               // Move player one position left
+        sub     x19, x19, 1                     // Move player one position left
+        str     x19, [x1, TSTATE_POS_X]
 
-end_handle_a:
+handle_a__end:
         ldp     lr, x19, [sp], 16
         ret
 
 /*
  * Params:
- *      x0: player x position
- *      x1: player y position
- *      x2: GPIO_GPLEV0 flags
- * Returns:
- *      x0: modified player x position
- *      x1: modified player y position
+ *      x0: u32 (on press flags)
+ *      x1: mut struct TetrominoState*
  */
 handle_d:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x2, GPIO_D
-        cbz     x19, end_handle_d
+	and     x19, x0, GPIO_D
+        cbz     x19, handle_d__end
 
-        cmp     x0, 1                   // Check if player is touching right edge
-        b.eq    end_handle_d
+        ldr     x19, [x1, TSTATE_POS_X]
+        cmp     x19, (SCREEN_WIDTH - 1)         // Check if player is touching right edge
+        b.eq    handle_d__end
 
-        sub     x0, x0, 1               // Move player one position right
+        add     x19, x19, 1                     // Move player one position right
+        str     x19, [x1, TSTATE_POS_X]
 
-end_handle_d:
+handle_d__end:
         ldp     lr, x19, [sp], 16
         ret
 
 /*
  * Params:
- *      x0: player x position
- *      x1: player y position
- *      x2: GPIO_GPLEV0 flags
- *      x3: background color index
- * Returns:
- *      x0: modified player x position
- *      x1: modified player y position
- *      w2: -
- *      x3: modified background color index
+ *      x0: u32 (on press flags)
+ *      x1: mut struct TetrominoState*
  */
 handle_space:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x2, GPIO_SPACE
-        cbz     x19, end_handle_space
+	and     x19, x0, GPIO_SPACE
+        cbz     x19, handle_space__end
 
-        add     x3, x3, #1
-        cmp     x3, 6
-        csel    x3, x3, xzr, lt         // Set x3 to zero if equal to 6
+        ldr     x19, [x1, TSTATE_ID]
 
-end_handle_space:
+        add     x19, x19, #1
+        cmp     x19, 6
+        csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 6
+
+        str     x19, [x1, TSTATE_ID]
+
+handle_space__end:
         ldp     lr, x19, [sp], 16
         ret
 
