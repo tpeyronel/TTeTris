@@ -7,6 +7,8 @@
 
         .equ MOVEMENT_PER_STEP,         64
 
+        .equ SQUARE_SIZE,               80
+
         .equ BOARD_WIDTH,               10
         .equ BOARD_HEIGHT,              22
         .equ BOARD_SIZE,                BOARD_WIDTH * BOARD_HEIGHT
@@ -274,32 +276,25 @@ TETROMINOS:
 main:
 	mov     x28, x0         // Save framebuffer address to x28
 
-
         // Allocate and init struct GameState
         sub     sp, sp, STRUCT_GAME_STATE_SIZE
         mov     x0, sp
         bl      init_game_state
 
-
-        ldr     x0, =TETROMINOS
-
-        mov     x20, #320               // Player x coordinate        (bottom) 1 <= x <= SCREEN_HEIGHT (top)
-        mov     x21, #240               // Player y coordinate         (right) 1 <= x <= SCREEN_WIDTH (left)
-        mov     x22, 0                  // bg color index | default 0
-        ldr     w23, BG_COLORS          // bg color | default BG_COLORS[0]
-        ldr     w24, PLAYER_COLOR       // player color | default PLAYER_COLOR
-
-        mov     x10, 0                  // square x coordinate
-        mov     x11, 0                  // square y coordinate
-        mov     x12, 50                 // square size
-        bl      get_time
-        mov     w13, w0                 // w13 last movement
-
-	// Ejemplo de uso de gpios
+	// Set GPIOs 0..9 to read
 	mov     x9, GPIO_BASE
-
-	// Setea gpios 0 - 9 como lectura
 	str     wzr, [x9, GPIO_GPFSEL0]
+
+
+        ldr     w23, BG_COLORS          // w23 <- bg color | default BG_COLORS[0]
+        ldr     w24, PLAYER_COLOR       // w24 <- player color | default PLAYER_COLOR
+
+        mov     x20, 0                  // x20 <- square x coordinate
+        mov     x21, 0                  // x21 <- square y coordinate
+        bl      get_time
+        mov     w22, w0                 // w22 <- square's last movement
+
+
 
 game_loop:
 
@@ -321,9 +316,11 @@ game_loop:
 next_row:
 	mov     x25, SCREEN_WIDTH       // Set x25 to remaining columns
 next_col:
-        cmp     x25, x20                 // Check if we are in same column as player
+        ldr     x9, [sp, TETROMINO_STATE + TSTATE_POS_X]
+        cmp     x25, x9                 // Check if we are in same column as player
         b.ne    pxl_bg
-        cmp     x26, x21                 // Check if we are in same row as player
+        ldr     x9, [sp, TETROMINO_STATE + TSTATE_POS_Y]
+        cmp     x26, x9                 // Check if we are in same row as player
         b.ne    pxl_bg
 
 pxl_player:
@@ -368,19 +365,19 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         // bl      draw_filled_square
 
 
-        mov     x0, x10
-        mov     x1, x11
-        mov     w2, w13
-        mov     x3, x12
+        mov     x0, x20
+        mov     x1, x21
+        mov     w2, w22
+        mov     x3, SQUARE_SIZE
         bl      advance_square_maybe
-        mov     x10, x0
-        mov     x11, x1
-        mov     w13, w2
+        mov     x20, x0
+        mov     x21, x1
+        mov     w22, w2
 
 
-        mov     x0, x10
-        mov     x1, x11
-        mov     x2, x12
+        mov     x0, x20
+        mov     x1, x21
+        mov     x2, SQUARE_SIZE
         mov     x3, x28
         mov     w4, w24
         bl      draw_filled_square
@@ -865,7 +862,7 @@ advance_square_maybe:
         ldr     x0, =SCREEN_WIDTH
         sub     x0, x0, x3
         cmp     x20, x0                         // Check if square is horizontally out of bounds
-        b.lt    advance_square_maybe__end
+        b.le    advance_square_maybe__end
 
         // Square is at end of row
         mov     x20, 0                          // Set square at beginning of row
@@ -875,7 +872,7 @@ advance_square_maybe:
         ldr     x0, =SCREEN_HEIGH
         sub     x0, x0, x3
         cmp     x21, x0                         // Check if square is vertically out of bounds
-        b.lt    advance_square_maybe__end
+        b.le    advance_square_maybe__end
 
         // Square is vertically out of bounds
         mov     x21, 0                          // Set square at bottom row
