@@ -275,16 +275,10 @@ main:
 	mov     x28, x0         // Save framebuffer address to x28
 
 
-        // Allocate struct GameState
+        // Allocate and init struct GameState
         sub     sp, sp, STRUCT_GAME_STATE_SIZE
-        // TODO: implement init_game_state subroutine
-        add     x0, sp, INPUT_STATE
-        bl      init_input_state
-        add     x0, sp, TETROMINO_STATE
-        bl      init_tetromino_state
-
-        bl      get_time
-        str     w0, [sp, LAST_TICK]
+        mov     x0, sp
+        bl      init_game_state
 
 
         ldr     x0, =TETROMINOS
@@ -413,18 +407,42 @@ game_loop__sleep:
 
         b game_loop
 
+
 /*
  * Params:
- *      x0: mut struct InputState*
+ *      x0: out struct GameState*       <- game_state
+ */
+init_game_state:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x0                 // x19 <- game_state
+
+        bl      get_time
+        str     w0, [x19, LAST_TICK]
+
+        add     x0, x19, INPUT_STATE
+        bl      init_input_state
+
+        add     x0, x19, TETROMINO_STATE
+        bl      init_tetromino_state
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+/*
+ * Params:
+ *      x0: out struct InputState*
  */
 init_input_state:
         stur    wzr, [x0, PRESSED_STATE]
         stur    wzr, [x0, ON_PRESS_STATE]
         ret
 
+
 /*
  * Params:
- *      x0: mut struct TetrominoState*
+ *      x0: out struct TetrominoState*
  */
 init_tetromino_state:
         stur    xzr, [x0, TSTATE_ID]
@@ -438,13 +456,13 @@ init_tetromino_state:
 
 /*
  * Params:
- *      x0: mut struct InputState*
+ *      x0: in/out struct InputState*
  */
 read_input:
         stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
 
-        ldr     w19, [x0, PRESSED_STATE]        // Save last pressed state to compute on press state
+        ldr     w19, [x0, PRESSED_STATE]        // Load last pressed state to compute on press state
 
 	mov     x20, GPIO_BASE
 	ldr     w20, [x20, GPIO_GPLEV0]         // w20 = new pressed state
