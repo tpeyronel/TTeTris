@@ -22,6 +22,8 @@
 
         .equ NUM_TETROMINOS,                    7
 
+        .equ MS_PER_TICK,               50
+        .equ US_PER_TICK,               MS_PER_TICK * 1000
 
 	.equ GPIO_BASE,                 0x3f200000
 	.equ GPIO_GPFSEL0,              0x00
@@ -54,7 +56,8 @@
         .equ COLLISION_RESULT_EXISTING_BLOCK,   0b10
 
 /* struct GameState */
-        .equ INPUT_STATE,               0                                       // struct InputState
+        .equ LAST_TICK,                 0                                       // u32
+        .equ INPUT_STATE,               LAST_TICK + 4                         // struct InputState
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE   // struct TetrominoState
         .equ BOARD_STATE,               TETROMINO_STATE + STRUCT_TSTATE_SIZE    // struct BoardState
 
@@ -280,6 +283,8 @@ main:
         add     x0, sp, TETROMINO_STATE
         bl      init_tetromino_state
 
+        bl      get_time
+        str     w0, [sp, LAST_TICK]
 
 
         ldr     x0, =TETROMINOS
@@ -394,6 +399,17 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         mov     x4, x28
         mov     w5, 0xFFFF00
         bl      draw_line
+
+
+game_loop__sleep:
+        ldr     w0, [sp, LAST_TICK]
+        bl      get_elapsed_time
+        mov     w2, US_PER_TICK
+        cmp     w0, w2
+        b.lt    game_loop__sleep
+        ldr     w0, [sp, LAST_TICK]
+        add     w0, w0, w2
+        str     w0, [sp, LAST_TICK]
 
         b game_loop
 
@@ -825,7 +841,7 @@ advance_square_maybe:
         b.lt    advance_square_maybe__end
 
         // Enough time has passed since last step
-        mov     w19, w1                         // Set last step as current time
+        add     w19, w19, w2                    // Advance last step by time per step
         add     x20, x20, x3                    // Advance square position by its size
 
         ldr     x0, =SCREEN_WIDTH
