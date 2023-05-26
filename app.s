@@ -5,9 +5,9 @@
 	.equ BYTES_PER_PIXEL_SHIFT, 2
         .equ BYTES_PER_SCREEN_ROW, SCREEN_WIDTH * BYTES_PER_PIXEL
 
-        .equ MOVEMENT_PER_STEP,         64
+        .equ MOVEMENT_PER_STEP,         40
 
-        .equ SQUARE_SIZE,               80
+        .equ SQUARE_SIZE,               40
 
         .equ BOARD_WIDTH,               10
         .equ BOARD_HEIGHT,              22
@@ -43,7 +43,7 @@
         // .equ GPIO_CLK_CTL_ADDRESS,      0x3f101070
         // .equ GPIO_CLK_DIV,              0x5A0C0000
         // .equ GPIO_CLK_CTL,              0x5A000011
-        .equ MS_PER_STEP,               500
+        .equ MS_PER_STEP,               250
         .equ US_PER_STEP,               MS_PER_STEP * 1000
 
         BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x00F0000F
@@ -496,6 +496,10 @@ process_input:
         bl      handle_d
         bl      handle_space
 
+        mov     x0, x20
+        bl      clamp_player_coords
+
+
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
         ret
@@ -512,10 +516,7 @@ handle_w:
         cbz     x19, handle_w__end
 
         ldr     x19, [x1, TSTATE_POS_Y]
-        cmp     x19, (SCREEN_HEIGH - 1)   // Check if player is touching top edge
-        b.eq    handle_w__end
-
-        add     x19, x19, MOVEMENT_PER_STEP     // Move player one position up
+        add     x19, x19, MOVEMENT_PER_STEP     // Move player up
         str     x19, [x1, TSTATE_POS_Y]
 
 handle_w__end:
@@ -534,10 +535,7 @@ handle_s:
         cbz     x19, handle_s__end
 
         ldr     x19, [x1, TSTATE_POS_Y]
-        cmp     x19, 0                   // Check if player is touching bottom edge
-        b.eq    handle_s__end
-
-        sub     x19, x19, MOVEMENT_PER_STEP     // Move player one position down
+        sub     x19, x19, MOVEMENT_PER_STEP     // Move player down
         str     x19, [x1, TSTATE_POS_Y]
 
 handle_s__end:
@@ -556,10 +554,7 @@ handle_a:
         cbz     x19, handle_a__end
 
         ldr     x19, [x1, TSTATE_POS_X]
-        cmp     x19, 0                          // Check if player is touching left edge
-        b.eq    handle_a__end
-
-        sub     x19, x19, MOVEMENT_PER_STEP     // Move player one position left
+        sub     x19, x19, MOVEMENT_PER_STEP     // Move player left
         str     x19, [x1, TSTATE_POS_X]
 
 handle_a__end:
@@ -578,15 +573,13 @@ handle_d:
         cbz     x19, handle_d__end
 
         ldr     x19, [x1, TSTATE_POS_X]
-        cmp     x19, (SCREEN_WIDTH - 1)         // Check if player is touching right edge
-        b.eq    handle_d__end
-
         add     x19, x19, MOVEMENT_PER_STEP     // Move player one position right
         str     x19, [x1, TSTATE_POS_X]
 
 handle_d__end:
         ldp     lr, x19, [sp], 16
         ret
+
 
 /*
  * Params:
@@ -609,6 +602,45 @@ handle_space:
 
 handle_space__end:
         ldp     lr, x19, [sp], 16
+        ret
+
+
+/*
+ * Params:
+ *      x0: in/out struct TetrominoState*
+ */
+clamp_player_coords:
+        /* Clamp x coordinate */
+        ldr     x9, [x0, TSTATE_POS_X]
+
+        cmp     x9, 0
+        b.ge    clamp_player_coords__end_left
+        mov     x9, 0
+clamp_player_coords__end_left:
+
+        cmp     x9, (SCREEN_WIDTH - 1)
+        b.le    clamp_player_coords__end_right
+        mov     x9, (SCREEN_WIDTH - 1)
+clamp_player_coords__end_right:
+
+        str     x9, [x0, TSTATE_POS_X]
+
+
+        /* Clamp y coordinate */
+        ldr     x9, [x0, TSTATE_POS_Y]
+
+        cmp     x9, 0
+        b.ge    clamp_player_coords__end_bottom
+        mov     x9, 0
+clamp_player_coords__end_bottom:
+
+        cmp     x9, (SCREEN_HEIGH - 1)
+        b.le    clamp_player_coords__end_top
+        mov     x9, (SCREEN_HEIGH - 1)
+clamp_player_coords__end_top:
+
+        str     x9, [x0, TSTATE_POS_Y]
+
         ret
 
 
