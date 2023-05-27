@@ -48,6 +48,21 @@
         .equ MS_PER_STEP,               250
         .equ US_PER_STEP,               MS_PER_STEP * 1000
 
+        .equ DIGIT_BASE_WIDTH,          4
+        .equ DIGIT_BASE_HEIGHT,         7
+        .equ DIGIT_BASE_SEGMENT_SIZE,   4
+
+
+        /* Bit flags used for drawing digits. */
+        .equ DIGIT_SEGMENT_0,           1 << 0
+        .equ DIGIT_SEGMENT_1,           1 << 1
+        .equ DIGIT_SEGMENT_2,           1 << 2
+        .equ DIGIT_SEGMENT_3,           1 << 3
+        .equ DIGIT_SEGMENT_4,           1 << 4
+        .equ DIGIT_SEGMENT_5,           1 << 5
+        .equ DIGIT_SEGMENT_6,           1 << 6
+
+
         BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x00F0000F
         BG_COLOR: .dword 0xFFFFFFFF
         PLAYER_COLOR: .dword 0xFFFFFFFF
@@ -67,6 +82,12 @@
         .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
 
         .equ STRUCT_GAME_STATE_SIZE,    BOARD_STATE + STRUCT_BSTATE_SIZE
+
+/* struct GameStats */
+        .equ GS_SCORE,                  0                       // u64
+        .equ GS_COMPLETED_ROWS,         GS_SCORE + 8            // u64
+
+        .equ STRUCT_GS_SIZE,            GS_COMPLETED_ROWS + 8
 
 /* struct InputState */
         .equ PRESSED_STATE,             0                       // u32
@@ -103,6 +124,16 @@
         .equ TDATA,                     0                       // u8[4][4]             [0][0] is bottom left, [0][3] is bottom right
 
         .equ STRUCT_TDATA_SIZE,         TDATA + TETROMINO_BOARD_SIZE_IN_BYTES
+
+
+/* struct DrawNumberInfo */
+        .equ DNI_POS_X,                 0                       // u64
+        .equ DNI_POS_Y,                 DNI_POS_X + 8           // u64
+        .equ DNI_VALUE,                 DNI_POS_Y + 8           // u64
+        .equ DNI_MAX_DIGITS,            DNI_VALUE + 8           // u64
+        .equ DNI_COLOR,                 DNI_MAX_DIGITS + 8      // u32
+
+        .equ STRUCT_DNI_SIZE,           DNI_COLOR + 4
 
 
 /* Data for all 7 tetrominos */
@@ -272,6 +303,31 @@ TETROMINOS:
         .word 0x0000FF00
 
 
+/* Data for drawing decimal digits */
+/* u32[10] */
+DIGITS_FONT:
+/* Digit 0: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 1: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_5
+/* Digit 2: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 3: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 4: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5
+/* Digit 5: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_6
+/* Digit 6: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_6
+/* Digit 7: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 8: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 9: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+
+
 
 /*
  * x19: framebuffer address (could be x9-15 ?)
@@ -349,6 +405,44 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 	sub     x26, x26, 1             // Decrement remaining rows
 	cbnz    x26, next_row           // If not at last row, draw next row
         /* Finished drawing background */
+
+        // mov     x0, 16
+        // mov     x1, 16
+        // mov     x2, 16
+        // mov     w3, w24
+        // mov     x4, x28
+        // bl      draw_horizontal_line
+
+        // mov     x0, 32
+        // mov     x1, 32
+        // mov     x2, 16
+        // mov     w3, w24
+        // mov     x4, x28
+        // bl      draw_vertical_line
+
+
+        mov     x0, 320
+        mov     x1, 80
+        mov     w2, w24
+        mov     x3, x28
+        bl      draw_time
+
+//         mov     x6, 64
+//         mov     w7, 0
+//
+// next_digit:
+//         mov     x0, x6
+//         mov     x1, 64
+//         mov     x2, 28
+//         mov     w3, w7
+//         mov     w4, w24
+//         mov     x5, x28
+//         bl      draw_decimal_digit
+//         add     x6, x6, 40
+//         add     w7, w7, 1
+//         cmp     w7, 10
+//         b.lt    next_digit
+
 
 
         // ldr     x0, [sp, (TETROMINO_STATE + TSTATE_POS_X)]
@@ -1020,10 +1114,10 @@ draw_line__end:
 
 /*
  * Params:
- *      x0: left point x coordinate            (left) 0 <= x < SCREEN_WIDTH (right)
- *      x1: left point y coordinate          (bottom) 0 <= y < SCREEN_HEIGHT (top)
- *      x2: right point x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
- *      x3: right point y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x0: left point x coordinate          (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: left point y coordinate           (top) 0 <= y < SCREEN_HEIGHT (bottom)
+ *      x2: right point x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x3: right point y coordinate          (top) 0 <= y < SCREEN_HEIGHT (bottom)
  *      x4: beginning of framebuffer
  *      w5: color
  */
@@ -1169,6 +1263,90 @@ draw_line_high_slope__keep_x:
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 80
         ret
+
+
+/*
+ * Params:
+ *      x0: u64         <- x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: u64         <- length > 0
+ *      w3: u32         <- color
+ *      x4: out u32*    <- beginning of framebuffer
+ * Comments:
+ *      Draws a line from (x0, x1) to (x0 + x2, x1)
+ */
+draw_horizontal_line:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x5, x4
+        mov     w4, w3
+        mov     x3, x2
+        mov     x2, BYTES_PER_PIXEL
+        bl      draw_line_by_offset
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+/*
+ * Params:
+ *      x0: u64         <- x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: u64         <- length > 0
+ *      w3: u32         <- color
+ *      x4: out u32*    <- beginning of framebuffer
+ * Comments:
+ *      Draws a line from (x0, x1) to (x0, x1 + x2)
+ */
+draw_vertical_line:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x5, x4
+        mov     w4, w3
+        mov     x3, x2
+        mov     x2, SCREEN_WIDTH
+        lsl     x2, x2, BYTES_PER_PIXEL_SHIFT
+        sub     x2, xzr, x2
+        bl      draw_line_by_offset
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+/*
+ * Params:
+ *      x0: u64         <- x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: u64         <- offset in bytes
+ *      x3: u64         <- steps > 0
+ *      w4: u32         <- color
+ *      x5: out u32*    <- beginning of framebuffer
+ * Comments:
+ *      Draws a line from (x0, x1) to (x0 + x2, x1)
+ */
+draw_line_by_offset:
+        stp     lr, x19, [sp, -16]!
+
+        // Convert game y coordinates to screen y coordinates
+        mov     x9, (SCREEN_HEIGH - 1)
+        sub     x1, x9, x1
+
+        mov     x9, SCREEN_WIDTH              // x9 = screen width
+        mul     x9, x9, x1                    // x9 = initial vertical offset
+        add     x9, x9, x0                    // x9 = initial vertical offset + initial horizontal offset
+        lsl     x9, x9, BYTES_PER_PIXEL_SHIFT // x9 = total offset
+        add     x5, x5, x9                    // x5 = &framebuffer['first pixel of line']
+
+
+draw_line_by_offset__next_pixel:
+        str     w4, [x5]                                // Color pixel
+        add     x5, x5, x2                              // Advance to next pixel by offset parameter
+        subs    x3, x3, 1                               // Decrement remaining steps
+        b.gt    draw_line_by_offset__next_pixel         // Loop only if line has not been completed
+
+        ldp     lr, x19, [sp], 16
+        ret
+
 
 
 /*
@@ -1434,13 +1612,259 @@ binary_to_decimal__end:
 
 
 
+/*
+ * Params:
+ *      x0: u64         <- bottom left x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- bottom left y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: u64         <- digit size offset. Drawn digit will have size (4 + x3) * (7 + 2 * x3)
+ *      w3: u8          <- binary digit in range [0..9]
+ *      w4: u32         <- color
+ *      x5: out u8*     <- beginning of framebuffer
+ */
+draw_decimal_digit:
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+
+        mov     x20, x0                                 // x20 <- bottom left x coordinate
+        mov     x21, x1                                 // x21 <- bottom left y coordinate
+        add     x22, x2, DIGIT_BASE_SEGMENT_SIZE        // x22 <- segment size
+        mov     w23, w4                                 // w23 <- color
+        mov     x24, x5                                 // x24 <- beginning of framebuffer
+
+        ldr     x19, =DIGITS_FONT       // x19 <- pointer to array of digits font
+        lsl     x9, x3, 2               // Convert index (digit) to offset in bytes (u32)
+        add     x19, x19, x9            // x19 <- pointer to data for our digit
+        ldr     w19, [x19]              // w19 <- segment flags of our digit
+
+
+        and     w9, w19, DIGIT_SEGMENT_0
+        cbz     w9, draw_decimal_digit__skip_seg_0
+
+        mov     x0, x20
+        mov     x1, x21
+        mov     x2, x22
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_horizontal_line
+draw_decimal_digit__skip_seg_0:
+
+
+        and     w9, w19, DIGIT_SEGMENT_1
+        cbz     w9, draw_decimal_digit__skip_seg_1
+
+        mov     x0, x20
+        mov     x1, x21
+        mov     x2, x22
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_vertical_line
+draw_decimal_digit__skip_seg_1:
+
+
+        and     w9, w19, DIGIT_SEGMENT_2
+        cbz     w9, draw_decimal_digit__skip_seg_2
+
+        add     x0, x20, x22
+        sub     x0, x0, 1
+        mov     x1, x21
+        mov     x2, x22
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_vertical_line
+draw_decimal_digit__skip_seg_2:
+
+
+        and     w9, w19, DIGIT_SEGMENT_3
+        cbz     w9, draw_decimal_digit__skip_seg_3
+
+        mov     x0, x20
+        add     x1, x21, x22
+        sub     x1, x1, 1
+        mov     x2, x22
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_horizontal_line
+draw_decimal_digit__skip_seg_3:
+
+
+        and     w9, w19, DIGIT_SEGMENT_4
+        cbz     w9, draw_decimal_digit__skip_seg_4
+
+        mov     x0, x20
+        add     x1, x21, x22
+        sub     x1, x1, 1
+        mov     x2, x22
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_vertical_line
+draw_decimal_digit__skip_seg_4:
+
+
+        and     w9, w19, DIGIT_SEGMENT_5
+        cbz     w9, draw_decimal_digit__skip_seg_5
+
+        add     x0, x20, x22
+        sub     x0, x0, 1
+        add     x1, x21, x22
+        sub     x1, x1, 1
+        mov     x2, x22
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_vertical_line
+draw_decimal_digit__skip_seg_5:
+
+
+        and     w9, w19, DIGIT_SEGMENT_6
+        cbz     w9, draw_decimal_digit__skip_seg_6
+
+        mov     x0, x20
+        add     x1, x21, x22
+        add     x1, x1, x22
+        sub     x1, x1, 2
+        mov     x2, x22
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_horizontal_line
+draw_decimal_digit__skip_seg_6:
+
+
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
+        ret
+
+
+/*
+ * Params:
+ *      x0: u64         <- bottom right x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- bottom right y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      w2: u32         <- color
+ *      x3: out u8*     <- beginning of framebuffer
+ */
+draw_time:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x0         // x19 <- x coordinate
+
+        bl      get_time
+        mov     w9, 1000
+        udiv    w0, w0, w9      // w0 <- time in milliseconds
+
+
+        mov     w4, w2          // w4 <- color
+        mov     x2, x0          // x2 <- time in milliseconds
+        mov     x0, x19         // x0 <- x coordinate
+        mov     x1, x1          // x1 <- y coordinate
+        mov     x5, x3          // x5 <- beginning of framebuffer
+        mov     x3, 5           // x3 <- max digits
+        bl      draw_number
+
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+
+/*
+ * Params:
+ *      x0: u64         <- bottom right x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- bottom right y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: u64         <- number to draw
+ *      x3: u64         <- max digits
+ *      w4: u32         <- color
+ *      x5: out u8*     <- beginning of framebuffer
+ */
+draw_number:
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        /* (x0, x1) represents the bottom right coordinate of the drawn digit */
+
+        mov     x19, x5                         // const x19 <- beginning of framebuffer
+
+        sub     sp, sp, STRUCT_DNI_SIZE
+        mov     x20, sp                         // x20 <- struct DrawNumberInfo*
+
+        /* Move arguments to struct DrawNumberInfo */
+        str     x0, [x20, DNI_POS_X]
+        str     x1, [x20, DNI_POS_Y]
+        str     x2, [x20, DNI_VALUE]
+        str     x3, [x20, DNI_MAX_DIGITS]
+        str     w4, [x20, DNI_COLOR]
+
+        ldr     x9, [x20, DNI_MAX_DIGITS]
+        sub     sp, sp, x9              // Make space for digits array
+        mov     x21, sp                 // x21: const u8* <- pointer to beginning of digits array
+
+        // Convert number to decimal
+        ldr     x0, [x20, DNI_VALUE]    // x0 <- number to draw
+        mov     x1, x21                 // x1 <- pointer to digits array
+        mov     x2, x9                  // x2 <- max digits
+        bl      binary_to_decimal
+
+        mov     x22, x0                 // x22 <- amount of digits to draw (<= max digits)
+
+draw_number__next_digit:
+        ldr     x9, [x20, DNI_POS_X]    // x9 = dni.pos_x
+        sub     x9, x9, 16              // x9 -= 16 <- move x coordinate left by width
+        add     x9, x9, 1               // x9 += 1 <- x coordinate points to bottom left coordinate of digit
+        str     x9, [x20, DNI_POS_X]    // dni.pos_x = x9
+
+        ldr     x0, [x20, DNI_POS_X]    // x0 <- x coordinate
+        ldr     x1, [x20, DNI_POS_Y]    // x1 <- y coordinate
+        mov     x2, 12                  // x2 <- digit width
+        ldrb    w3, [x21]               // w3 <- digits[i]
+        ldr     w4, [x20, DNI_COLOR]    // w4 <- color
+        mov     x5, x19                 // x5 <- beginning of framebuffer
+        bl      draw_decimal_digit      // draw digit
+
+        ldr     x9, [x20, DNI_POS_X]    // x9 = dni.pos_x
+        sub     x9, x9, 4               // x9 += 4 <- add to x padding for drawing next digit
+        str     x9, [x20, DNI_POS_X]    // dni.pos_x = x9
+        add     x21, x21, 1             // x21 = &digits[i + 1] <- pointer to next digit
+        subs    x22, x22, 1             // x22 <- decrement remaining digits and check if any remain
+        b.gt    draw_number__next_digit
+
+        /* All digits are drawn */
+
+        ldr     x9, [x20, DNI_MAX_DIGITS]
+        add     sp, sp, x9              // Pop digits array from stack
+
+        add     sp, sp, STRUCT_DNI_SIZE // Pop struct DrawNumberInfo
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
+        ret
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 test_binary_to_decimal:
         stp     lr, x19, [sp, -16]!
 
 
         sub     sp, sp, 4       // reserve space for 4 digits
         mov     x0, 0           // use 0 as initial number
-again:
+test_binary_to_decimal__again:
         mov     x1, sp
         mov     x2, 4
         bl      binary_to_decimal
@@ -1448,9 +1872,12 @@ again:
         mov     w0, 0
         ldr     w1, =TEST_BINARY_TO_DECIMAL_MAX
         bl      rand_gen_in_range
-        b       again
+        b       test_binary_to_decimal__again
         add     sp, sp, 4
 
 
         ldp     lr, x19, [sp], 16
         ret
+
+
+
