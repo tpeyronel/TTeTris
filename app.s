@@ -1384,3 +1384,47 @@ rand_gen_in_range:
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
         ret
+
+
+
+/*
+ * Params:
+ *      x0: u64         <- binary number
+ *      x1: out u8*     <- output buffer
+ *      x2: u64         <- buffer length
+ * Comments:
+ *      Number is converted to binary and written to the buffer pointed by x1,
+ *      where each element represents a decimal digit.
+ *      Least significant digits are written to the beginning of the array.
+ *      E.g.: convert 0xFF to decimal (255)
+ *              -> x1 = [5, 5, 2]
+ */
+binary_to_decimal:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x19, x0                 // x19 <- current dividend
+        mov     x20, 10                 // x20 <- divisor (always 10)
+        mov     x21, 0                  // x21 <- i (current digit, from right to left, used for indexing buffer)
+
+binary_to_decimal__next_digit:
+        cmp     x21, x2                 // check if there is buffer remaining
+        b.ge    binary_to_decimal__end  // break if buffer ended
+
+        udiv    x9, x19, x20            //  x9 <- dividend `div` 10             (quotient)
+        mul     x10, x9, x20            // x10 <- (dividend `div` 10) * 10      (quotient times divisor)
+        sub     x10, x19, x10           // x10 <- remainder of x19 / 10         (remainder, in range [0..9])
+
+        strb    w10, [x1]                       // store digit in buffer
+        mov     x19, x9                         // use quotient as new dividend
+        add     x1, x1, 1                       // advance pointer to next element
+        add     x21, x21, 1                     // increment index
+        b       binary_to_decimal__next_digit   // loop
+
+binary_to_decimal__end:
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+
