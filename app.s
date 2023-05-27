@@ -24,6 +24,8 @@
 
         .equ NUM_TETROMINOS,                    7
 
+        .equ TEST_BINARY_TO_DECIMAL_MAX,        10000
+
         .equ MS_PER_TICK,               50
         .equ US_PER_TICK,               MS_PER_TICK * 1000
 
@@ -1392,6 +1394,8 @@ rand_gen_in_range:
  *      x0: u64         <- binary number
  *      x1: out u8*     <- output buffer
  *      x2: u64         <- buffer length
+ * Returns:
+ *      x0: u64         <- amount of digits of decimal number
  * Comments:
  *      Number is converted to binary and written to the buffer pointed by x1,
  *      where each element represents a decimal digit.
@@ -1415,16 +1419,38 @@ binary_to_decimal__next_digit:
         mul     x10, x9, x20            // x10 <- (dividend `div` 10) * 10      (quotient times divisor)
         sub     x10, x19, x10           // x10 <- remainder of x19 / 10         (remainder, in range [0..9])
 
-        strb    w10, [x1]                       // store digit in buffer
-        mov     x19, x9                         // use quotient as new dividend
-        add     x1, x1, 1                       // advance pointer to next element
-        add     x21, x21, 1                     // increment index
-        b       binary_to_decimal__next_digit   // loop
+        strb    w10, [x1]               // store digit in buffer
+        mov     x19, x9                 // use quotient as new dividend
+        add     x1, x1, 1               // advance pointer to next element
+        add     x21, x21, 1             // increment index
+        cbnz    x19, binary_to_decimal__next_digit      // loop only if new dividend is not 0
 
 binary_to_decimal__end:
+        mov     x0, x21         // x0 <- amount of digits of converted decimal number
+
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
         ret
 
 
 
+test_binary_to_decimal:
+        stp     lr, x19, [sp, -16]!
+
+
+        sub     sp, sp, 4       // reserve space for 4 digits
+        mov     x0, 0           // use 0 as initial number
+again:
+        mov     x1, sp
+        mov     x2, 4
+        bl      binary_to_decimal
+
+        mov     w0, 0
+        ldr     w1, =TEST_BINARY_TO_DECIMAL_MAX
+        bl      rand_gen_in_range
+        b       again
+        add     sp, sp, 4
+
+
+        ldp     lr, x19, [sp], 16
+        ret
