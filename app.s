@@ -48,10 +48,6 @@
         .equ MS_PER_STEP,               250
         .equ US_PER_STEP,               MS_PER_STEP * 1000
 
-        .equ DIGIT_BASE_WIDTH,          4
-        .equ DIGIT_BASE_HEIGHT,         7
-        .equ DIGIT_BASE_SEGMENT_SIZE,   4
-
 
         /* Bit flags used for drawing digits. */
         .equ DIGIT_SEGMENT_0,           1 << 0
@@ -131,7 +127,9 @@
         .equ DNI_POS_Y,                 DNI_POS_X + 8           // u64
         .equ DNI_VALUE,                 DNI_POS_Y + 8           // u64
         .equ DNI_MAX_DIGITS,            DNI_VALUE + 8           // u64
-        .equ DNI_COLOR,                 DNI_MAX_DIGITS + 8      // u32
+        .equ DNI_DIGIT_WIDTH,           DNI_MAX_DIGITS + 8      // u64
+        .equ DNI_DIGIT_SPACING,         DNI_DIGIT_WIDTH + 8     // u64
+        .equ DNI_COLOR,                 DNI_DIGIT_SPACING + 8   // u32
 
         .equ STRUCT_DNI_SIZE,           DNI_COLOR + 4
 
@@ -1616,7 +1614,7 @@ binary_to_decimal__end:
  * Params:
  *      x0: u64         <- bottom left x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
  *      x1: u64         <- bottom left y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
- *      x2: u64         <- digit size offset. Drawn digit will have size (4 + x3) * (7 + 2 * x3)
+ *      x2: u64         <- width  =>  height = 2 * width - 1
  *      w3: u8          <- binary digit in range [0..9]
  *      w4: u32         <- color
  *      x5: out u8*     <- beginning of framebuffer
@@ -1627,11 +1625,11 @@ draw_decimal_digit:
         stp     x22, x23, [sp, 32]
         stp     x24, x25, [sp, 48]
 
-        mov     x20, x0                                 // x20 <- bottom left x coordinate
-        mov     x21, x1                                 // x21 <- bottom left y coordinate
-        add     x22, x2, DIGIT_BASE_SEGMENT_SIZE        // x22 <- segment size
-        mov     w23, w4                                 // w23 <- color
-        mov     x24, x5                                 // x24 <- beginning of framebuffer
+        mov     x20, x0                 // x20 <- bottom left x coordinate
+        mov     x21, x1                 // x21 <- bottom left y coordinate
+        mov     x22, x2                 // x22 <- segment size
+        mov     w23, w4                 // w23 <- color
+        mov     x24, x5                 // x24 <- beginning of framebuffer
 
         ldr     x19, =DIGITS_FONT       // x19 <- pointer to array of digits font
         lsl     x9, x3, 2               // Convert index (digit) to offset in bytes (u32)
@@ -1754,12 +1752,14 @@ draw_time:
         udiv    w0, w0, w9      // w0 <- time in milliseconds
 
 
-        mov     w4, w2          // w4 <- color
-        mov     x2, x0          // x2 <- time in milliseconds
-        mov     x0, x19         // x0 <- x coordinate
-        mov     x1, x1          // x1 <- y coordinate
-        mov     x5, x3          // x5 <- beginning of framebuffer
+        mov     x7, x3          // x7 <- beginning of framebuffer
+        mov     w6, w2          // w6 <- color
+        mov     x5, 4           // x5 <- digit spacing
+        mov     x4, 16          // x4 <- digit width
         mov     x3, 5           // x3 <- max digits
+        mov     x2, x0          // x2 <- number (time in milliseconds)
+        mov     x1, x1          // x1 <- y coordinate
+        mov     x0, x19         // x0 <- x coordinate
         bl      draw_number
 
 
@@ -1775,17 +1775,19 @@ draw_time:
  *      x1: u64         <- bottom right y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      x2: u64         <- number to draw
  *      x3: u64         <- max digits
- *      w4: u32         <- color
- *      x5: out u8*     <- beginning of framebuffer
+ *      x4: u64         <- digit width
+ *      x5: u64         <- digit spacing
+ *      w6: u32         <- color
+ *      x7: out u8*     <- beginning of framebuffer
  */
 draw_number:
-        stp     lr, x19, [sp, -64]!
+        stp     lr, x19, [sp, -48]!
         stp     x20, x21, [sp, 16]
         stp     x22, x23, [sp, 32]
 
-        /* (x0, x1) represents the bottom right coordinate of the drawn digit */
+        /* (x0, x1) represents the bottom right coordinate of the drawn number */
 
-        mov     x19, x5                         // const x19 <- beginning of framebuffer
+        mov     x19, x7                         // const x19 <- beginning of framebuffer
 
         sub     sp, sp, STRUCT_DNI_SIZE
         mov     x20, sp                         // x20 <- struct DrawNumberInfo*
@@ -1795,7 +1797,9 @@ draw_number:
         str     x1, [x20, DNI_POS_Y]
         str     x2, [x20, DNI_VALUE]
         str     x3, [x20, DNI_MAX_DIGITS]
-        str     w4, [x20, DNI_COLOR]
+        str     x4, [x20, DNI_DIGIT_WIDTH]
+        str     x5, [x20, DNI_DIGIT_SPACING]
+        str     w6, [x20, DNI_COLOR]
 
         ldr     x9, [x20, DNI_MAX_DIGITS]
         sub     sp, sp, x9              // Make space for digits array
@@ -1810,24 +1814,28 @@ draw_number:
         mov     x22, x0                 // x22 <- amount of digits to draw (<= max digits)
 
 draw_number__next_digit:
-        ldr     x9, [x20, DNI_POS_X]    // x9 = dni.pos_x
-        sub     x9, x9, 16              // x9 -= 16 <- move x coordinate left by width
-        add     x9, x9, 1               // x9 += 1 <- x coordinate points to bottom left coordinate of digit
-        str     x9, [x20, DNI_POS_X]    // dni.pos_x = x9
+        ldr     x9, [x20, DNI_POS_X]            // x9 = dni.pos_x
+        ldr     x10, [x20, DNI_DIGIT_WIDTH]     // x10 = dni.digit_width
+        sub     x9, x9, x10                     // x9 -= dni.digit_width <- move x coordinate left by digit width
+        add     x9, x9, 1                       // x9 += 1 <- x coordinate points to bottom left coordinate of digit
+        str     x9, [x20, DNI_POS_X]            // dni.pos_x = x9
 
-        ldr     x0, [x20, DNI_POS_X]    // x0 <- x coordinate
-        ldr     x1, [x20, DNI_POS_Y]    // x1 <- y coordinate
-        mov     x2, 12                  // x2 <- digit width
-        ldrb    w3, [x21]               // w3 <- digits[i]
-        ldr     w4, [x20, DNI_COLOR]    // w4 <- color
-        mov     x5, x19                 // x5 <- beginning of framebuffer
-        bl      draw_decimal_digit      // draw digit
+        ldr     x0, [x20, DNI_POS_X]            // x0 <- x coordinate
+        ldr     x1, [x20, DNI_POS_Y]            // x1 <- y coordinate
+        ldr     x9, [x20, DNI_DIGIT_WIDTH]      // x9 = dni.digit_width
+        mov     x2, x9                          // x2 <- digit width
+        ldrb    w3, [x21]                       // w3 <- digits[i]
+        ldr     w4, [x20, DNI_COLOR]            // w4 <- color
+        mov     x5, x19                         // x5 <- beginning of framebuffer
+        bl      draw_decimal_digit              // draw digit
 
-        ldr     x9, [x20, DNI_POS_X]    // x9 = dni.pos_x
-        sub     x9, x9, 4               // x9 += 4 <- add to x padding for drawing next digit
-        str     x9, [x20, DNI_POS_X]    // dni.pos_x = x9
-        add     x21, x21, 1             // x21 = &digits[i + 1] <- pointer to next digit
-        subs    x22, x22, 1             // x22 <- decrement remaining digits and check if any remain
+        ldr     x9, [x20, DNI_POS_X]            // x9 = dni.pos_x
+        ldr     x10, [x20, DNI_DIGIT_SPACING]   // x10 = dni.digit_spacing
+        sub     x9, x9, x10                     // x9 -= dni.digit_spacing <- move x by digit spacing for drawing next digit
+        sub     x9, x9, 1                       // (off by one)
+        str     x9, [x20, DNI_POS_X]            // dni.pos_x = x9
+        add     x21, x21, 1                     // x21 = &digits[i + 1] <- pointer to next digit
+        subs    x22, x22, 1                     // x22 <- decrement remaining digits and check if any remain
         b.gt    draw_number__next_digit
 
         /* All digits are drawn */
@@ -1839,7 +1847,7 @@ draw_number__next_digit:
 
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 64
+        ldp     lr, x19, [sp], 48
         ret
 
 
