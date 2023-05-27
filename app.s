@@ -90,177 +90,168 @@
 
         .equ STRUCT_TDATA_SIZE,         TDATA + TETROMINO_BOARD_SIZE_IN_BYTES
 
-
-/* Data for all 7 tetrominos */
 TETROMINOS:
 /* Tetromino I: */
-// id: 0
         .word 0x31C7EF  // Color
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x01010101
+        .word 0xFFFFFFFF
         .word 0x00000000
 
-        .word 0x00010000
-        .word 0x00010000
-        .word 0x00010000
-        .word 0x00010000
+        .word 0x0000FF00
+        .word 0x0000FF00
+        .word 0x0000FF00
+        .word 0x0000FF00
 
         .word 0x00000000
-        .word 0x01010101
+        .word 0xFFFFFFFF
         .word 0x00000000
         .word 0x00000000
 
-        .word 0x00000100
-        .word 0x00000100
-        .word 0x00000100
-        .word 0x00000100
+        .word 0x00FF0000
+        .word 0x00FF0000
+        .word 0x00FF0000
+        .word 0x00FF0000
 
 
 /* Tetromino J: */
-// id: 1
         .word 0x5A65AD  // Color
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x01010100
-        .word 0x01000000
+        .word 0x00FFFFFF
+        .word 0x000000FF
 
         .word 0x00000000
-        .word 0x01010000
-        .word 0x00010000
-        .word 0x00010000
+        .word 0x0000FFFF
+        .word 0x0000FF00
+        .word 0x0000FF00
 
         .word 0x00000000
-        .word 0x00000100
-        .word 0x01010100
+        .word 0x00FF0000
+        .word 0x00FFFFFF
         .word 0x00000000
 
         .word 0x00000000
-        .word 0x00010000
-        .word 0x00010000
-        .word 0x00010100
+        .word 0x0000FF00
+        .word 0x0000FF00
+        .word 0x00FFFF00
 
 /* Tetromino L: */
-// id: 2
         .word 0xEF7921  // Color
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x01010100
-        .word 0x00000100
+        .word 0x00FFFFFF
+        .word 0x00FF0000
 
         .word 0x00000000
-        .word 0x00010000
-        .word 0x00010000
-        .word 0x01010000
+        .word 0x0000FF00
+        .word 0x0000FF00
+        .word 0x0000FFFF
 
         .word 0x00000000
-        .word 0x01000000
-        .word 0x01010100
+        .word 0x000000FF
+        .word 0x00FFFFFF
         .word 0x00000000
 
         .word 0x00000000
-        .word 0x00010100
-        .word 0x00010000
-        .word 0x00010000
+        .word 0x00FFFF00
+        .word 0x0000FF00
+        .word 0x0000FF00
 
 /* Tetromino O: */
-// id: 3
         .word 0xF7D308  // Color
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x00010100
-        .word 0x00010100
+        .word 0x00FFFF00
+        .word 0x00FFFF00
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x00010100
-        .word 0x00010100
+        .word 0x00FFFF00
+        .word 0x00FFFF00
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x00010100
-        .word 0x00010100
+        .word 0x00FFFF00
+        .word 0x00FFFF00
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x00010100
-        .word 0x00010100
+        .word 0x00FFFF00
+        .word 0x00FFFF00
 
 /* Tetromino S: */
-// id: 4
         .word 0x42B642  // Color
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x01010000
-        .word 0x00010100
+        .word 0x0000FFFF
+        .word 0x00FFFF00
 
         .word 0x00000000
-        .word 0x00010000
-        .word 0x01010000
-        .word 0x01000000
+        .word 0x0000FF00
+        .word 0x0000FFFF
+        .word 0x000000FF
 
         .word 0x00000000
-        .word 0x01010000
-        .word 0x00010100
+        .word 0x0000FFFF
+        .word 0x00FFFF00
         .word 0x00000000
 
         .word 0x00000000
-        .word 0x00000100
-        .word 0x00010100
-        .word 0x00010000
+        .word 0x00FF0000
+        .word 0x00FFFF00
+        .word 0x0000FF00
 
 /* Tetromino Z: */
-// id: 5
         .word 0xEF2029  // Color
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x00010100
-        .word 0x01010000
+        .word 0x00FFFF00
+        .word 0x0000FFFF
 
         .word 0x00000000
-        .word 0x01000000
-        .word 0x01010000
-        .word 0x00010000
+        .word 0x000000FF
+        .word 0x0000FFFF
+        .word 0x0000FF00
 
         .word 0x00000000
-        .word 0x00010100
-        .word 0x01010000
+        .word 0x00FFFF00
+        .word 0x0000FFFF
         .word 0x00000000
 
         .word 0x00000000
-        .word 0x00010000
-        .word 0x00010100
-        .word 0x00000100
+        .word 0x0000FF00
+        .word 0x00FFFF00
+        .word 0x00FF0000
 
 /* Tetromino T: */
-// id: 6
         .word 0xAD4D9C  // Color
 
         .word 0x00000000
         .word 0x00000000
-        .word 0x01010100
-        .word 0x00010000
+        .word 0x00FFFFFF
+        .word 0x0000FF00
 
         .word 0x00000000
-        .word 0x00010000
-        .word 0x01010000
-        .word 0x00010000
+        .word 0x0000FF00
+        .word 0x0000FFFF
+        .word 0x0000FF00
 
         .word 0x00000000
-        .word 0x00010000
-        .word 0x01010100
+        .word 0x0000FF00
+        .word 0x00FFFFFF
         .word 0x00000000
 
         .word 0x00000000
-        .word 0x00010000
-        .word 0x00010100
-        .word 0x00010000
+        .word 0x0000FF00
+        .word 0x00FFFF00
+        .word 0x0000FF00
 
 
 /*
@@ -303,7 +294,6 @@ main:
 	bl draw_filled_rectangle
 
 
-	/*
     add x0, sp, BOARD_STATE
 
 	mov x1, 5
@@ -380,24 +370,23 @@ main:
 	sturb w1, [x0, 69]
 	sturb w1, [x0, 79]
 	sturb w1, [x0, 89]
-	*/
 
 	add x0, sp, TETROMINO_STATE
-	mov x1, 2
+	mov x1, 6
 	stur x1, [x0, TSTATE_ID]
-	mov x1, 0
+	mov x1, 6
 	stur x1, [x0, TSTATE_POS_X]
-	mov x1, 0
+	mov x1, 1
 	stur x1, [x0, TSTATE_POS_Y]
-	mov x1, 0
+	mov x1, 3
 	stur x1, [x0, TSTATE_ROT]
+
 	
 	mov x0, sp
 	mov x1, x28
 	bl draw_game
 
 
-	/*
     movz x5, 0x2FFF, lsl 16
 wait:
     sub x5, x5, 1
@@ -418,7 +407,6 @@ wait:
 	mov x0, sp
 	mov x1, x28
 	bl draw_game
-	*/
 
 
 inf:	
@@ -625,12 +613,12 @@ draw_game:
 	mul x1, x1, x4
 
 	add x0, x0, x1
+
 	add x0, x0, x19
 
 	ldurb w1, [x0]
 
-	mov x4, 0
-	cbz x1, draw_game_no_square
+	cbz x1, draw_game_not_tetromino		// draw whatever there is in the board
 	mov x4, x22
 	b draw_game_no_square
 
@@ -648,7 +636,7 @@ draw_game_not_tetromino:
 
     mov x4, x0
 
-    draw_game_no_square:
+    draw_game_no_square:    // draw bakcground
     mov x0, x15
     mov x1, x14
     mov x2, SQUARE_SIZE
