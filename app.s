@@ -58,10 +58,11 @@
         .equ COLLISION_RESULT_EXISTING_BLOCK,   0b10
 
 /* struct GameState */
-        .equ LAST_TICK,                 0                                       // u32
-        .equ INPUT_STATE,               LAST_TICK + 4                         // struct InputState
-        .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE   // struct TetrominoState
-        .equ BOARD_STATE,               TETROMINO_STATE + STRUCT_TSTATE_SIZE    // struct BoardState
+        .equ LAST_TICK,                 0                                               // u32
+        .equ INPUT_STATE,               LAST_TICK + 4                                   // struct InputState
+        .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
+        .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
+        .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
 
         .equ STRUCT_GAME_STATE_SIZE,    BOARD_STATE + STRUCT_BSTATE_SIZE
 
@@ -78,6 +79,12 @@
         .equ TSTATE_POS_Y,              TSTATE_POS_X + 8        // i64
 
         .equ STRUCT_TSTATE_SIZE,        TSTATE_POS_Y + 8
+
+/* struct ChooserBagState */
+        .equ CBAG_REMAINING,            0                       // u8
+        .equ CBAG_VALUES,               CBAG_REMAINING + 1      // u8[7] = u8[NUM_TETROMINOS]
+
+        .equ STRUCT_CBAG_STATE_SIZE,    CBAG_VALUES + (NUM_TETROMINOS * 1)
 
 /* struct BoardState */
         .equ BSTATE_BOARD,              0                       // u8[22][10] = u8[BOARD_HEIGHT][BOARD_WIDTH]
@@ -422,6 +429,9 @@ init_game_state:
 
         add     x0, x19, TETROMINO_STATE
         bl      init_tetromino_state
+
+        add     x0, x19, CHOOSER_BAG_STATE
+        bl      recreate_chooser_bag
 
         ldp     lr, x19, [sp], 16
         ret
@@ -1258,4 +1268,117 @@ check_collision__end:
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 48
+        ret
+
+
+/*
+ * Params:
+ *      x0: out struct ChooserBagState*  <- chooser_bag_state
+ */
+recreate_chooser_bag:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        mov     w19, NUM_TETROMINOS             // x19 <- NUM_TETROMINOS
+        strb    w19, [x0, CBAG_REMAINING]       // chooser_bag_state.remaining = NUM_TETROMINOS
+
+        add     x20, x0, CBAG_VALUES    // x20 = &chooser_bag_state.values[0]
+
+        mov     x21, 0                  // i = 0
+recreate_chooser_bag__init_values:
+        strb    w21, [x20]              // chooser_bag_state.values[i] = i
+        add     x20, x20, 1             // x20 = &chooser_bag_state.values[i + 1] (move to next byte)
+        add     x21, x21, 1             // i += 1
+        cmp     x21, NUM_TETROMINOS     // i < NUM_TETROMINOS ?
+        b.lt    recreate_chooser_bag__init_values
+        /* values == [0, 1, 2, 3, ..., NUM_TETROMINOS - 1] */
+
+
+        add     x20, x0, CBAG_VALUES    // x20 <- pointer to the beginning of the array's segment that remains 'not randomized'
+        mov     w21, NUM_TETROMINOS     // w21 <- amount of remaining (non randomized) tetrominos
+
+recreate_chooser_bag__randomize:
+        /* Gen random number in range [0..rem_tetrominos) */
+        mov     w0, 0
+        mov     w1, w21
+        bl      rand_gen_in_range
+        /* x0 contains random index */
+
+        // Swap a[0] with a[r]
+        add     x9, x20, x0     // x9 = &a[r] = pointer to the randomly chosen element
+        ldrb    w22, [x20]      // w22 = a[0]
+        ldrb    w23, [x9]       // w23 = a[r]
+        strb    w23, [x20]      // a[0] = a[r]
+        strb    w22, [x9]       // a[r] = a[0]
+
+        add     x20, x20, 1             // advance array pointer to the beginning of the next segment
+        subs    w21, w21, 1             // decrement remaining tetrominos
+        b.gt    recreate_chooser_bag__randomize // loop only if more than 1 tetromino is not yet randomized
+        /* values = [randomized] */
+
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct ChooserBagState*  <- chooser_bag_state
+ * Returns:
+ *      x0: u64         <- tetromino_id
+ */
+choose_next_tetromino:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x0         // x19 <- struct ChooserBagState*
+
+        ldrb    w9, [x19, CBAG_REMAINING]               // w9 = chooser_bag_state.remaining
+        cmp     w9, 0                                   // chooser_bag_state.remaining == 0 ?
+        b.gt    choose_next_tetromino__dont_recreate
+        /* Bag out of values, we need to recreate it */
+        mov     x0, x19
+        bl      recreate_chooser_bag
+choose_next_tetromino__dont_recreate:
+
+        /* Load last value and decrement remaining count */
+        ldrb    w9, [x19, CBAG_REMAINING]       // x9 = chooser_bag_state.remaining
+        sub     w9, w9, 1                       // x9 <- index of last element in bag
+        strb    w9, [x19, CBAG_REMAINING]       // chooser_bag_state.remaining -= 1
+        add     x9, x9, CBAG_VALUES             // x9 <- offset to start of array + index of last element
+        add     x9, x19, x9                     // x9 <- pointer to last element of array
+        ldrb    w0, [x9]                        // x0 = chooser_bag_state.values[LAST]
+
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      w0: u32         <- min (inclusive)
+ *      w1: u32         <- max (exclusive)
+ * Returns:
+ *      w0: u32         <- random number in range [min; max)
+ */
+rand_gen_in_range:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        ldr     x19, =RNG_NUMBER_ADDRESS
+        ldr     w19, [x19]              // w19 <- random number in range [0..U32_MAX]
+
+        sub     w20, w1, w0             // w20 <- max - min == length of range
+        udiv    w21, w19, w20           // w21 <- R div (max - min)
+        mul     w21, w21, w20           // w21 <- (R div (max - min)) * (max - min)
+
+        sub     w19, w19, w21           // w19 <- remainder of R / (max - min), in range [0..(max - min))
+        add     w0, w19, w0             //  w0 <- offseted remainder, in range [min..max)
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
         ret
