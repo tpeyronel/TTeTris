@@ -1741,7 +1741,7 @@ draw_decimal_digit__skip_seg_6:
  * Params:
  *      x0: u64         <- bottom left x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
  *      x1: u64         <- bottom left y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
- *      x2: u64         <- width  =>  height = 2 * width - 1
+ *      x2: u64         <- width  =>  height = 2 * width - (thickness % 2)
  *      x3: u64         <- thickness
  *      w4: u8          <- binary digit in range [0..9]
  *      w5: u32         <- color
@@ -1762,8 +1762,16 @@ draw_decimal_digit_with_thickness:
 
         sub     x24, x2, 1              // x24 <- A = width - 1
         sub     x25, x3, 1              // x25 <- B = thickness - 1
-        lsr     x26, x25, 1             // x26 <- C = B / 2
+        lsr     x26, x3, 1              // x26 <- C = thickness / 2
         add     x27, x24, x26           // x27 <- D = A + C
+
+        sub     sp, sp, 8
+        and     x9, x3, 0b1             // 1 if odd, 0 if even
+        eor     x9, x9, 0b1             // 1 if even, 0 if odd
+        add     x9, x24, x9             // x9 = A + (0|1)
+        sub     x9, x9, x26             // x9 = A - C + (0|1)
+        str     x9, [sp]                // [sp] = A - C + (0|1)
+
 
 
         ldr     x19, =DIGITS_FONT       // x19 <- pointer to array of digits font
@@ -1815,8 +1823,8 @@ draw_decimal_digit_with_thickness__skip_seg_1:
 draw_decimal_digit_with_thickness__skip_seg_2:
 
 
-        add     x21, x21, x24   // y = y + A
-        sub     x21, x21, x26   // y = y + A - C
+        ldr     x9, [sp]
+        add     x21, x21, x9    // y = y + (A - C + (0|1))
 
 
         and     w9, w19, DIGIT_SEGMENT_3
@@ -1861,8 +1869,8 @@ draw_decimal_digit_with_thickness__skip_seg_4:
 draw_decimal_digit_with_thickness__skip_seg_5:
 
 
-        add     x21, x21, x24   // y = y + A
-        sub     x21, x21, x26   // y = y + A - C
+        ldr     x9, [sp]
+        add     x21, x21, x9    // y = y + (A - C + (0|1))
 
 
         and     w9, w19, DIGIT_SEGMENT_6
@@ -1877,6 +1885,7 @@ draw_decimal_digit_with_thickness__skip_seg_5:
         bl      draw_filled_rectangle
 draw_decimal_digit_with_thickness__skip_seg_6:
 
+        add     sp, sp, 8
 
         ldp     x26, x27, [sp, 64]
         ldp     x24, x25, [sp, 48]
@@ -1902,9 +1911,11 @@ draw_time:
         str     x1, [sp, DNI_POS_Y]
         mov     x9, 5
         str     x9, [sp, DNI_MAX_DIGITS]
-        mov     x9, 16
+        mov     x9, 33
         str     x9, [sp, DNI_DIGIT_WIDTH]
-        mov     x9, 4
+        mov     x9, 8
+        str     x9, [sp, DNI_DIGIT_THICKNESS]
+        mov     x9, 8
         str     x9, [sp, DNI_DIGIT_SPACING]
         str     w2, [sp, DNI_COLOR]
 
@@ -1962,9 +1973,8 @@ draw_number__next_digit:
 
         ldr     x0, [x20, DNI_POS_X]            // x0 <- x coordinate
         ldr     x1, [x20, DNI_POS_Y]            // x1 <- y coordinate
-        ldr     x9, [x20, DNI_DIGIT_WIDTH]      // x9 = dni.digit_width
-        mov     x2, x9                          // x2 <- digit width
-        mov     x3, 3                           // x3 <- thickness
+        ldr     x2, [x20, DNI_DIGIT_WIDTH]      // x2 <- digit width
+        ldr     x3, [x20, DNI_DIGIT_THICKNESS]  // x3 <- thickness
         ldrb    w4, [x21]                       // w4 <- digits[i]
         ldr     w5, [x20, DNI_COLOR]            // w5 <- color
         mov     x6, x19                         // x6 <- beginning of framebuffer
