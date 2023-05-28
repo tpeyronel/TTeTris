@@ -128,7 +128,8 @@
         .equ DNI_VALUE,                 DNI_POS_Y + 8           // u64
         .equ DNI_MAX_DIGITS,            DNI_VALUE + 8           // u64
         .equ DNI_DIGIT_WIDTH,           DNI_MAX_DIGITS + 8      // u64
-        .equ DNI_DIGIT_SPACING,         DNI_DIGIT_WIDTH + 8     // u64
+        .equ DNI_DIGIT_THICKNESS,       DNI_DIGIT_WIDTH + 8     // u64
+        .equ DNI_DIGIT_SPACING,         DNI_DIGIT_THICKNESS + 8 // u64
         .equ DNI_COLOR,                 DNI_DIGIT_SPACING + 8   // u32
 
         .equ STRUCT_DNI_SIZE,           DNI_COLOR + 4
@@ -1895,23 +1896,29 @@ draw_decimal_digit_with_thickness__skip_seg_6:
 draw_time:
         stp     lr, x19, [sp, -16]!
 
-        mov     x19, x0         // x19 <- x coordinate
+        sub     sp, sp, STRUCT_DNI_SIZE
+
+        str     x0, [sp, DNI_POS_X]
+        str     x1, [sp, DNI_POS_Y]
+        mov     x9, 5
+        str     x9, [sp, DNI_MAX_DIGITS]
+        mov     x9, 16
+        str     x9, [sp, DNI_DIGIT_WIDTH]
+        mov     x9, 4
+        str     x9, [sp, DNI_DIGIT_SPACING]
+        str     w2, [sp, DNI_COLOR]
 
         bl      get_time
         mov     w9, 1000
         udiv    w0, w0, w9      // w0 <- time in milliseconds
 
+        str     x0, [sp, DNI_VALUE]
 
-        mov     x7, x3          // x7 <- beginning of framebuffer
-        mov     w6, w2          // w6 <- color
-        mov     x5, 4           // x5 <- digit spacing
-        mov     x4, 16          // x4 <- digit width
-        mov     x3, 5           // x3 <- max digits
-        mov     x2, x0          // x2 <- number (time in milliseconds)
-        mov     x1, x1          // x1 <- y coordinate
-        mov     x0, x19         // x0 <- x coordinate
+        mov     x0, sp
+        mov     x1, x3          // x1 <- beginning of framebuffer
         bl      draw_number
 
+        add     sp, sp, STRUCT_DNI_SIZE
 
         ldp     lr, x19, [sp], 16
         ret
@@ -1921,35 +1928,18 @@ draw_time:
 
 /*
  * Params:
- *      x0: u64         <- bottom right x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
- *      x1: u64         <- bottom right y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
- *      x2: u64         <- number to draw
- *      x3: u64         <- max digits
- *      x4: u64         <- digit width
- *      x5: u64         <- digit spacing
- *      w6: u32         <- color
- *      x7: out u8*     <- beginning of framebuffer
+ *      x0: in/out struct DrawNumberInfo*       <- draw_number_info   (consumed)
+ *      x1: out u8*                             <- beginning of framebuffer
  */
 draw_number:
         stp     lr, x19, [sp, -48]!
         stp     x20, x21, [sp, 16]
         stp     x22, x23, [sp, 32]
 
-        /* (x0, x1) represents the bottom right coordinate of the drawn number */
+        /* (dni.pos_x, dni.pos_y) represents the bottom right coordinate of the drawn number */
 
-        mov     x19, x7                         // const x19 <- beginning of framebuffer
-
-        sub     sp, sp, STRUCT_DNI_SIZE
-        mov     x20, sp                         // x20 <- struct DrawNumberInfo*
-
-        /* Move arguments to struct DrawNumberInfo */
-        str     x0, [x20, DNI_POS_X]
-        str     x1, [x20, DNI_POS_Y]
-        str     x2, [x20, DNI_VALUE]
-        str     x3, [x20, DNI_MAX_DIGITS]
-        str     x4, [x20, DNI_DIGIT_WIDTH]
-        str     x5, [x20, DNI_DIGIT_SPACING]
-        str     w6, [x20, DNI_COLOR]
+        mov     x19, x1                 // const x19 <- beginning of framebuffer
+        mov     x20, x0                 // const x20 <- in/out struct DrawNumberInfo*
 
         ldr     x9, [x20, DNI_MAX_DIGITS]
         sub     sp, sp, x9              // Make space for digits array
@@ -1993,8 +1983,6 @@ draw_number__next_digit:
 
         ldr     x9, [x20, DNI_MAX_DIGITS]
         add     sp, sp, x9              // Pop digits array from stack
-
-        add     sp, sp, STRUCT_DNI_SIZE // Pop struct DrawNumberInfo
 
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
