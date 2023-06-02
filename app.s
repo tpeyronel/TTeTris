@@ -26,8 +26,9 @@
 
         .equ TEST_BINARY_TO_DECIMAL_MAX,        10000
 
-        .equ MS_PER_TICK,               50
-        .equ US_PER_TICK,               MS_PER_TICK * 1000
+        .equ TICKS_PER_SECOND,          30
+        .equ MS_PER_TICK,               1000 / TICKS_PER_SECOND         // unused
+        .equ US_PER_TICK,               1000000 / MS_PER_TICK
 
 	.equ GPIO_BASE,                 0x3f200000
 	.equ GPIO_GPFSEL0,              0x00
