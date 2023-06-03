@@ -328,6 +328,48 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         mov     x3, x28
         bl      draw_tetris_cell
 
+        mov     x0, 100 + TETRIS_CELL_SIZE
+        mov     x1, 100
+        ldr     x2, =TETROMINOS
+        add     x2, x2, STRUCT_TETROMINO_SIZE
+        mov     x3, x28
+        bl      draw_tetris_cell
+
+        mov     x0, 100 + 2 * TETRIS_CELL_SIZE
+        mov     x1, 100
+        ldr     x2, =TETROMINOS
+        add     x2, x2, 2 * STRUCT_TETROMINO_SIZE
+        mov     x3, x28
+        bl      draw_tetris_cell
+
+        mov     x0, 100 + 3 * TETRIS_CELL_SIZE
+        mov     x1, 100
+        ldr     x2, =TETROMINOS
+        add     x2, x2, 3 * STRUCT_TETROMINO_SIZE
+        mov     x3, x28
+        bl      draw_tetris_cell
+
+        mov     x0, 100 + 4 * TETRIS_CELL_SIZE
+        mov     x1, 100
+        ldr     x2, =TETROMINOS
+        add     x2, x2, 4 * STRUCT_TETROMINO_SIZE
+        mov     x3, x28
+        bl      draw_tetris_cell
+
+        mov     x0, 100 + 5 * TETRIS_CELL_SIZE
+        mov     x1, 100
+        ldr     x2, =TETROMINOS
+        add     x2, x2, 5 * STRUCT_TETROMINO_SIZE
+        mov     x3, x28
+        bl      draw_tetris_cell
+
+        mov     x0, 100 + 6 * TETRIS_CELL_SIZE
+        mov     x1, 100
+        ldr     x2, =TETROMINOS
+        add     x2, x2, 6 * STRUCT_TETROMINO_SIZE
+        mov     x3, x28
+        bl      draw_tetris_cell
+
 
 
 game_loop__sleep:

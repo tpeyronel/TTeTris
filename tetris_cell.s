@@ -3,6 +3,7 @@ TETRIS_CELL_S:
 
         .include "./constants.s"
         .include "./rectangle.s"
+        .include "./line.s"
 
         .equ TETRIS_CELL_SIZE,          21
         .equ TETRIS_CELL_BORDER_SIZE,   4
@@ -171,6 +172,25 @@ draw_tetris_cell__end_border:
 
         bl      draw_filled_rectangle
 
+
+
+        /* Draw bottom left diagonal line */
+        mov     x0, x20
+        mov     x1, x21
+        add     x2, x0, TETRIS_CELL_BORDER_SIZE - 1
+        add     x3, x1, TETRIS_CELL_BORDER_SIZE - 1
+        mov     x4, x23                                 // x4 = framebuffer
+        ldr     w5, [x22, TETROMINO_DIFFUSE_COLOR]      // w5 = diffuse color
+        bl      draw_line
+
+        /* Draw top right diagonal line */
+        add     x0, x20, TETRIS_CELL_SIZE - 1
+        add     x1, x21, TETRIS_CELL_SIZE - 1
+        sub     x2, x0, TETRIS_CELL_BORDER_SIZE - 1
+        sub     x3, x1, TETRIS_CELL_BORDER_SIZE - 1
+        mov     x4, x23                                 // x4 = framebuffer
+        ldr     w5, [x22, TETROMINO_DIFFUSE_COLOR]      // w5 = diffuse color
+        bl      draw_line
 
 
 

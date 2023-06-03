@@ -66,9 +66,9 @@ TETROMINOS:
 
 
 /* Tetromino J: */
-        .word 0x5A65AD  // Diffuse color
-        .word 0x31C7EF  // Specular color
-        .word 0x31C7EF  // Ambient color
+        .word 0x0000CC  // Diffuse color
+        .word 0x0000FF  // Specular color
+        .word 0x000099  // Ambient color
 
         .word 0x00000000
         .word 0x00000000
@@ -91,9 +91,9 @@ TETROMINOS:
         .word 0x00FFFF00
 
 /* Tetromino L: */
-        .word 0xEF7921  // Diffuse color
-        .word 0x31C7EF  // Specular color
-        .word 0x31C7EF  // Ambient color
+        .word 0xCC6600  // Diffuse color
+        .word 0xFF8800  // Specular color
+        .word 0x994400  // Ambient color
 
         .word 0x00000000
         .word 0x00000000
@@ -116,9 +116,9 @@ TETROMINOS:
         .word 0x0000FF00
 
 /* Tetromino O: */
-        .word 0xF7D308  // Diffuse color
-        .word 0x31C7EF  // Specular color
-        .word 0x31C7EF  // Ambient color
+        .word 0xCCCC00  // Diffuse color
+        .word 0xFFFF00  // Specular color
+        .word 0x999900  // Ambient color
 
         .word 0x00000000
         .word 0x00000000
@@ -141,9 +141,9 @@ TETROMINOS:
         .word 0x00FFFF00
 
 /* Tetromino S: */
-        .word 0x42B642  // Diffuse color
-        .word 0x31C7EF  // Specular color
-        .word 0x31C7EF  // Ambient color
+        .word 0x00CC00  // Diffuse color
+        .word 0x00FF00  // Specular color
+        .word 0x009900  // Ambient color
 
         .word 0x00000000
         .word 0x00000000
@@ -166,9 +166,9 @@ TETROMINOS:
         .word 0x0000FF00
 
 /* Tetromino Z: */
-        .word 0xEF2029  // Diffuse color
-        .word 0x31C7EF  // Specular color
-        .word 0x31C7EF  // Ambient color
+        .word 0xCC0000  // Diffuse color
+        .word 0xFF0000  // Specular color
+        .word 0x990000  // Ambient color
 
         .word 0x00000000
         .word 0x00000000
@@ -191,9 +191,9 @@ TETROMINOS:
         .word 0x00FF0000
 
 /* Tetromino T: */
-        .word 0xAD4D9C  // Diffuse color
-        .word 0x31C7EF  // Specular color
-        .word 0x31C7EF  // Ambient color
+        .word 0x9900CC  // Diffuse color
+        .word 0xCC00FF  // Specular color
+        .word 0x660099  // Ambient color
 
         .word 0x00000000
         .word 0x00000000
