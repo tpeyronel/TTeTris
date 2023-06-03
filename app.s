@@ -16,9 +16,11 @@
 
         .equ TEST_BINARY_TO_DECIMAL_MAX,        10000
 
-        .equ TICKS_PER_SECOND,          30
+        .equ TICKS_PER_SECOND,          60
         .equ MS_PER_TICK,               1000 / TICKS_PER_SECOND         // unused
         .equ US_PER_TICK,               1000000 / TICKS_PER_SECOND
+
+        .equ BACK_BUFFER_ADDRESS,       0x1000000
 
 	.equ GPIO_BASE,                 0x3f200000
 	.equ GPIO_GPFSEL0,              0x00
@@ -157,7 +159,11 @@ DIGITS_FONT:
  * x28 (const): beginning of framebuffer
  */
 main:
-	mov     x28, x0         // Save framebuffer address to x28
+        sub     sp, sp, 8
+        str     x0, [sp]        // Save framebuffer to stack
+
+	// mov     x28, x0         // Save framebuffer address to x28
+        ldr     x28, =BACK_BUFFER_ADDRESS
 
         // Allocate and init struct GameState
         sub     sp, sp, STRUCT_GAME_STATE_SIZE
@@ -371,6 +377,10 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         bl      draw_tetris_cell
 
 
+        /* Copy back buffer to real framebuffer */
+        mov     x0, x28
+        ldr     x1, [sp, STRUCT_GAME_STATE_SIZE]        // restore original framebuffer address from stack
+        bl      copy_framebuffer
 
 game_loop__sleep:
         ldr     w0, [sp, LAST_TICK]
@@ -383,6 +393,35 @@ game_loop__sleep:
         str     w0, [sp, LAST_TICK]
 
         b game_loop
+
+
+
+
+/*
+ * Params:
+ *      x0: in u32*             <- src framebuffer
+ *      x1: out u32*            <- dst framebuffer
+ */
+copy_framebuffer:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, SCREEN_WIDTH
+        mov     x9, SCREEN_HEIGH
+        mul     x19, x19, x9            // x19 = width * height
+
+copy_framebuffer__next_pixel:
+        ldr     w9, [x0]
+        str     w9, [x1]
+
+        add     x0, x0, BYTES_PER_PIXEL
+        add     x1, x1, BYTES_PER_PIXEL
+        subs    x19, x19, 1
+        b.gt    copy_framebuffer__next_pixel
+
+
+        ldp     lr, x19, [sp], 16
+        ret
+
 
 
 /*
