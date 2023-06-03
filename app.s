@@ -50,7 +50,7 @@
         .equ DIGIT_SEGMENT_6,           1 << 6
 
 
-        BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x00F0000F
+        BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x001E1E1E, 0x00F0000F
         BG_COLOR: .dword 0xFFFFFFFF
         PLAYER_COLOR: .dword 0xFFFFFFFF
 
@@ -579,8 +579,8 @@ handle_space:
         ldr     x19, [x1, TSTATE_ID]
 
         add     x19, x19, #1
-        cmp     x19, 6
-        csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 6
+        cmp     x19, 7
+        csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 7
 
         str     x19, [x1, TSTATE_ID]
 
