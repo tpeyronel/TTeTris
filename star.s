@@ -24,6 +24,10 @@ draw_four_point_star:
         eor     x9, x9, 0b1
         sub     x2, x2, x9
 
+        /* Early return if size <= 0 */
+        cmp     x2, 0
+        b.le    draw_four_point_star__end
+        /* size >= 1 */
 
         sub     x19, x2, 1      // x19 = size - 1
         lsr     x19, x19, 1     // x19 = (size - 1) / 2
@@ -119,12 +123,12 @@ draw_four_point_star__end_of_row:
 draw_four_point_star__end_of_quadrant:
 
         /* Save arguments */
-        mov     x20, x0
+        mov     x20, x0         // x20 = center x coordinate
         mov     x9, SCREEN_HEIGH - 1
-        sub     x21, x9, x1     // Convert y to game coordinates
-        mov     x22, x2
-        mov     w23, w3
-        mov     x24, x4
+        sub     x21, x9, x1     // x21 = center y coordinate (in game coordinates)
+        mov     x22, x2         // x22 = size
+        mov     w23, w3         // w23 = color
+        mov     x24, x4         // x24 = framebuffer
 
 
         /* Draw center horizontal line */
@@ -145,7 +149,7 @@ draw_four_point_star__end_of_quadrant:
         bl      draw_vertical_line
 
 
-
+draw_four_point_star__end:
         ldp     x26, x27, [sp, 64]
         ldp     x24, x25, [sp, 48]
         ldp     x22, x23, [sp, 32]
