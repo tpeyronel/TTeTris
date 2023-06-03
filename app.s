@@ -2,7 +2,7 @@
         .include "./star.s"
         .include "./line.s"
 
-        .equ MOVEMENT_PER_STEP,         2
+        .equ MOVEMENT_PER_STEP,         1
 
         .equ SQUARE_SIZE,               40
 

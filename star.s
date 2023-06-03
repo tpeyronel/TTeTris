@@ -8,7 +8,7 @@ STARS_S:
  * Params:
  *      x0: u64         <- x position
  *      x1: u64         <- y position
- *      x2: u64         <- size
+ *      x2: u64         <- size => final size = isOdd(size) ? size : size - 1
  *      w3: u32         <- color
  *      x4: out u32*    <- framebuffer
  */
@@ -18,6 +18,12 @@ draw_four_point_star:
         stp     x22, x23, [sp, 32]
         stp     x24, x25, [sp, 48]
         stp     x26, x27, [sp, 64]
+
+        /* Normalize size (subtract 1 if size is even) */
+        and     x9, x2, 0b1
+        eor     x9, x9, 0b1
+        sub     x2, x2, x9
+
 
         sub     x19, x2, 1      // x19 = size - 1
         lsr     x19, x19, 1     // x19 = (size - 1) / 2
@@ -115,7 +121,7 @@ draw_four_point_star__end_of_quadrant:
         /* Save arguments */
         mov     x20, x0
         mov     x9, SCREEN_HEIGH - 1
-        sub     x21, x9, x1     // Convert to game coordinates
+        sub     x21, x9, x1     // Convert y to game coordinates
         mov     x22, x2
         mov     w23, w3
         mov     x24, x4
