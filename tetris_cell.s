@@ -158,40 +158,37 @@ draw_tetris_cell_trapezoids__next_col:
 
 draw_tetris_cell_trapezoids__end_row:
 
-        /* Advance pointers for outer loop */
-        sub     x9, xzr, x15
-        add     x9, x9, SCREEN_WIDTH    // Move pointer to beginning of next row (old size)
-        add     x9, x9, 1               // Move pointer to beginning of next row (new size)
-        lsl     x9, x9, BYTES_PER_PIXEL_SHIFT
+        /* Advance pointers for horizontal trapezoids */
+        // We need to move the pointers that are currently at the end of a row,
+        // to the beginning of the next row (above or below), offseted by one pixel to the right
+        neg     x10, x15
+        add     x10, x10, 1
+        lsl     x10, x10, BYTES_PER_PIXEL_SHIFT
 
+        mov     x11, SCREEN_WIDTH
+        lsl     x11, x11, BYTES_PER_PIXEL_SHIFT
+
+        add     x9, x10, x11
         add     x24, x24, x9
 
-
-        sub     x9, xzr, x15
-        sub     x9, x9, SCREEN_WIDTH    // Move pointer to beginning of next row (old size)
-        add     x9, x9, 1               // Move pointer to beginning of next row (new size)
-        lsl     x9, x9, BYTES_PER_PIXEL_SHIFT
-
+        sub     x9, x10, x11
         add     x25, x25, x9
 
 
-        mov     x9, SCREEN_WIDTH
-        mul     x9, x9, x15             // Point to beginning of column
-        sub     x9, xzr, x9             // Negate
-        add     x9, x9, 1               // Point to beginning of next column (old size)
-        add     x9, x9, SCREEN_WIDTH    // Point to beginning of next column (new size)
-        lsl     x9, x9, BYTES_PER_PIXEL_SHIFT
+        /* Advance pointers to vertical trapezoids */
+        // We need to move the pointers that are currently at the bottom of a column,
+        // to the beginning of the next column (left or right), offseted by one row down
+        mov     x10, SCREEN_WIDTH
+        mul     x10, x10, x15
+        neg     x10, x10
+        add     x10, x10, SCREEN_WIDTH
+        lsl     x10, x10, BYTES_PER_PIXEL_SHIFT
+        // x10 now moves a pointer to the second element of the current column (which has the same height as the first element of the next column)
 
+        add     x9, x10, BYTES_PER_PIXEL        // x9 now moves to the beginning of the column on the right
         add     x26, x26, x9
 
-
-        mov     x9, SCREEN_WIDTH
-        mul     x9, x9, x15             // Point to beginning of column
-        sub     x9, xzr, x9             // Negate
-        sub     x9, x9, 1               // Point to beginning of next column (old size)
-        add     x9, x9, SCREEN_WIDTH    // Point to beginning of next column (new size)
-        lsl     x9, x9, BYTES_PER_PIXEL_SHIFT
-
+        sub     x9, x10, BYTES_PER_PIXEL        // x9 now moves to the beginning of the column on the left
         add     x27, x27, x9
 
 
