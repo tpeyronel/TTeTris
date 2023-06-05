@@ -308,16 +308,25 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
         ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
         mov     x4, x28
-        mov     w5, 0xFFFFFFFF
+        mov     w5, 0xFF0000
         bl      draw_line
 
         mov     x0, (SCREEN_WIDTH / 2)
         mov     x1, (SCREEN_HEIGH / 2)
         ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
         ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
-        ldr     w4, =0x3F00FF00
+        ldr     w4, =0x7F00FF00
         mov     x5, x28
         bl      draw_line_fixedp
+
+        mov     x0, (SCREEN_WIDTH / 2)
+        mov     x1, (SCREEN_HEIGH / 2)
+        ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
+        ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
+        ldr     w4, =0x7F0000FF
+        mov     x5, x28
+        bl      draw_line_with_iter
+
 
 
         mov     x0, 400

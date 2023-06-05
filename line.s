@@ -1,8 +1,22 @@
 .ifndef LINE_S
 LINE_S:
 
-.include "./constants.s"
-.include "./pixel.s"
+        .include "./constants.s"
+        .include "./pixel.s"
+
+        .equ ROUNDING_CONSTANT,         1 << 31
+
+/* struct LineIter */
+        .equ LINEI_REMAINING,           0                       // u64
+        .equ LINEI_X_COORD,             LINEI_REMAINING + 8     // u64 (Q32)
+        .equ LINEI_Y_COORD,             LINEI_X_COORD + 8       // u64 (Q32)
+        .equ LINEI_X_STEP,              LINEI_Y_COORD + 8       // u64 (Q32)
+        .equ LINEI_Y_STEP,              LINEI_X_STEP + 8        // u64 (Q32)
+
+        .equ STRUCT_LINE_ITER_SIZE,     LINEI_Y_STEP + 8
+
+
+
 
 /*
  * Params:
@@ -444,6 +458,210 @@ draw_line_fixedp__next_pixel:
 
 
 
+
+
+/*
+ * Params:
+ *      x0: u64                         <- first point x coordinate
+ *      x1: u64                         <- first point y coordinate
+ *      x2: u64                         <- second point x coordinate
+ *      x3: u64                         <- second point y coordinate
+ *      x4: out struct LineIter*        <- line iterator
+ */
+line_iter_init:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        /*
+         * x19 <- remaining pixels
+         * x20 <- x coordinate (x0)
+         * x21 <- y coordinate (y0)
+         * x22 <- x step (x1)
+         * x23 <- y step (y1)
+         */
+
+        sub     x10, x2, x0     // x10 = x1 - x0 = dx
+        sub     x11, x3, x1     // x11 = y1 - y0 = dy
+
+        cmp     x10, 0
+        cneg    x12, x10, lt    // x12 = |x1 - x0| = |dx|
+
+        cmp     x11, 0
+        cneg    x13, x11, lt    // x13 = |y1 - y0| = |dy|
+
+
+
+        cmp     x12, x13                        // cmp(|dx|, |dy|)
+
+        /* Compute remaining pixels */
+        csel    x19, x12, x13, ge       // x19 = (|dx| >= |dy|) ? |dx| : |dy|
+        add     x19, x19, 1
+
+        /* TODO: handle dx == 0 && dy == 0 (x0 == x1 && y0 == y1) */
+        b.ge    line_iter_init__low_slope     // |dx| >= |dy|
+        b.lt    line_iter_init__high_slope    // |dx| < |dy|
+
+
+
+        /* |dx| >= |dy| */
+line_iter_init__low_slope:
+        /* compute x step */
+        mov     x22, 1          // x22 <- x step
+        cmp     x10, 0
+        cneg    x22, x22, lt    // x22 = dx < 0 ? -1 : 1
+        lsl     x22, x22, 32    // Convert x step to     Q32
+
+        /* compute y step */
+        lsl     x23, x11, 32    // x23 = dy             (Q32)
+        sdiv    x23, x23, x12   // x23 = dy / |dx|      (Q32)
+
+        b       line_iter_init__end_slope
+/* end low slope */
+
+
+        /* |dx| < |dy| */
+line_iter_init__high_slope:
+        /* compute x step */
+        lsl     x22, x10, 32    // x22 = dx             (Q32)
+        sdiv    x22, x22, x13   // x22 = dx / |dy|      (Q32)
+
+        /* compute y step */
+        mov     x23, 1          // x23 <- y step
+        cmp     x11, 0
+        cneg    x23, x23, lt    // x23 = dy < 0 ? -1 : 1
+        lsl     x23, x23, 32    // Convert y step to     Q32
+
+        b       line_iter_init__end_slope
+/* end high slope */
+
+
+line_iter_init__end_slope:
+
+
+
+        lsl     x20, x0, 32     // x20 <- x coordinate (Q32)
+        lsl     x21, x1, 32     // x21 <- y coordinate (Q32)
+
+        str     x19, [x4, LINEI_REMAINING]
+        str     x20, [x4, LINEI_X_COORD]
+        str     x21, [x4, LINEI_Y_COORD]
+        str     x22, [x4, LINEI_X_STEP]
+        str     x23, [x4, LINEI_Y_STEP]
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
+        ret
+
+
+
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct LineIter*     <- line iterator
+ * Returns:
+ *      x0: u64                         <- x coordinate
+ *      x1: u64                         <- y coordinate
+ *      x2: u64                         <- remaining pixels
+ */
+line_iter_next:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x20, x0                 // x20 <- struct LineIter*
+        mov     x19, ROUNDING_CONSTANT  // x19 <- rounding constant
+
+
+        /* round x and step */
+        ldr     x9, [x20, LINEI_X_COORD]        // x9 <- x coord
+        ldr     x10, [x20, LINEI_X_STEP]        // x10 <- x step
+
+        add     x0, x9, x19     // x0 <- x + "0.5"
+        lsr     x0, x0, 32      // x0 <- round(x)
+
+        add     x9, x9, x10     // Step x coordinate by x step
+        str     x9, [x20, LINEI_X_COORD]
+
+
+        /* round y and step */
+        ldr     x9, [x20, LINEI_Y_COORD]        // x9 <- y coord
+        ldr     x10, [x20, LINEI_Y_STEP]        // x10 <- y step
+
+        add     x1, x9, x19     // x1 <- y + "0.5"
+        lsr     x1, x1, 32      // x1 <- round(y)
+
+        add     x9, x9, x10     // Step y coordinate by y step
+        str     x9, [x20, LINEI_Y_COORD]
+
+
+        /* decrement remaining pixels */
+        ldr     x2, [x20, LINEI_REMAINING]        // x2 <- remaining pixels
+        sub     x2, x2, 1                         // Decrement remaining pixels
+        str     x2, [x20, LINEI_REMAINING]
+
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+
+
+
+/*
+ * Params:
+ *      x0: u64         <- first point x coordinate
+ *      x1: u64         <- first point y coordinate
+ *      x2: u64         <- second point x coordinate
+ *      x3: u64         <- second point y coordinate
+ *      w4: u32         <- argb color
+ *      x5: out u32*    <- framebuffer beginning
+ */
+draw_line_with_iter:
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+
+        mov     w19, w4         // w19 <- color
+        mov     x20, x5         // x20 <- framebuffer
+
+        sub     sp, sp, STRUCT_LINE_ITER_SIZE
+
+        mov     x4, sp
+        bl      line_iter_init
+
+
+draw_line_with_iter__next_pixel:
+        mov     x0, sp
+        bl      line_iter_next
+        /*
+         *      x0 <- x coordinate
+         *      x1 <- y coordinate
+         *      x2 <- remaining pixels
+         */
+
+        mov     x21, x2         // Save remaining pixels
+
+        mov     x2, x20          // x2 <- framebuffer
+        mov     w3, w19          // w3 <- color
+        bl      draw_argb_pixel_at
+
+        cmp     x21, 0
+        b.gt    draw_line_with_iter__next_pixel
+
+
+
+        add     sp, sp, STRUCT_LINE_ITER_SIZE
+
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
+        ret
 
 
 
