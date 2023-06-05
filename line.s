@@ -2,6 +2,7 @@
 LINE_S:
 
 .include "./constants.s"
+.include "./pixel.s"
 
 /*
  * Params:
@@ -320,6 +321,209 @@ draw_line_high_slope__keep_x:
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 80
         ret
+
+
+
+
+
+
+
+
+
+
+/*
+ * Params:
+ *      x0: u64         <- first point x coordinate
+ *      x1: u64         <- first point y coordinate
+ *      x2: u64         <- second point x coordinate
+ *      x3: u64         <- second point y coordinate
+ *      w4: u32         <- argb color
+ *      x5: out u32*    <- framebuffer beginning
+ */
+draw_line_fixedp_low_slope:
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+
+        mov     x20, x0         // x20 <- x coordinate
+        mov     x21, x1         // x21 <- y coordinate
+
+
+        mov     x22, 1          // x22 = 1
+        sub     x19, x2, x0     // x19 = x1 - x0
+        cmp     x19, 0
+        cneg    x19, x19, lt    // x19 = |x1 - x0|                      <- remaining columns
+        cneg    x22, x22, lt    // x22 = (x1 - x0) >= 0 ? 1 : -1        <- x step
+
+        sub     x23, x3, x1     // x23 = y1 - y0
+        lsl     x23, x23, 32    // x23 = y1 - y0 in Q32
+        sdiv    x23, x23, x19   // x23 = (y1 - y0) / |x1 - x0| in Q32   <- slope (y step) in Q32
+
+
+        lsl     x21, x21, 32    // Make y coordinate Q32
+
+draw_line_fixedp_low_slope__next_pixel:
+
+        mov     x0, x20         // x0 <- pixel x
+
+        // Round y to integer
+        mov     x1, 1
+        lsl     x1, x1, 31      // x1 = "0.5"
+        add     x1, x21, x1     // x1 = "y + 0.5"
+        lsr     x1, x1, 32      // x1 <- pixel y
+
+        mov     x2, x5          // x2 <- framebuffer
+        mov     w3, w4          // w3 <- color
+
+        bl      draw_argb_pixel_at
+
+
+
+        add     x20, x20, x22     // Step x coordinate by +/- 1 (x step)
+        add     x21, x21, x23     // Step y coordinate by slope (y step)
+        subs    x19, x19, 1
+        b.ge    draw_line_fixedp_low_slope__next_pixel
+
+
+
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
+        ret
+
+
+
+
+
+
+
+
+
+
+
+/*
+ * Params:
+ *      x0: u64         <- first point x coordinate
+ *      x1: u64         <- first point y coordinate
+ *      x2: u64         <- second point x coordinate
+ *      x3: u64         <- second point y coordinate
+ *      w4: u32         <- argb color
+ *      x5: out u32*    <- framebuffer beginning
+ */
+draw_line_fixedp:
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+
+        /*
+         * x19 <- remaining pixels
+         * x20 <- x coordinate (x0)
+         * x21 <- y coordinate (y0)
+         * x22 <- x step (x1)
+         * x23 <- y step (y1)
+         * x24 <- rounding constant
+         */
+
+        sub     x10, x2, x0     // x10 = x1 - x0 = dx
+        sub     x11, x3, x1     // x11 = y1 - y0 = dy
+
+        cmp     x10, 0
+        cneg    x12, x10, lt    // x12 = |x1 - x0| = |dx|
+
+        cmp     x11, 0
+        cneg    x13, x11, lt    // x13 = |y1 - y0| = |dy|
+
+
+
+        cmp     x12, x13                        // cmp(|dx|, |dy|)
+
+        /* Compute remaining pixels */
+        csel    x19, x12, x13, ge       // x19 = (|dx| >= |dy|) ? |dx| : |dy|
+
+        /* TODO: handle dx == 0 && dy == 0 (x0 == x1 && y0 == y1) */
+        b.ge    draw_line_fixedp__low_slope     // |dx| >= |dy|
+        b.lt    draw_line_fixedp__high_slope    // |dx| < |dy|
+
+
+
+        /* |dx| >= |dy| */
+draw_line_fixedp__low_slope:
+        /* compute x step */
+        mov     x22, 1          // x22 <- x step
+        cmp     x10, 0
+        cneg    x22, x22, lt    // x22 = dx < 0 ? -1 : 1
+        lsl     x22, x22, 32    // Convert x step to     Q32
+
+        /* compute y step */
+        lsl     x23, x11, 32    // x23 = dy             (Q32)
+        sdiv    x23, x23, x12   // x23 = dy / |dx|      (Q32)
+
+        b       draw_line_fixedp__end_slope
+/* end low slope */
+
+
+        /* |dx| < |dy| */
+draw_line_fixedp__high_slope:
+        /* compute x step */
+        lsl     x22, x10, 32    // x22 = dx             (Q32)
+        sdiv    x22, x22, x13   // x22 = dx / |dy|      (Q32)
+
+        /* compute y step */
+        mov     x23, 1          // x23 <- y step
+        cmp     x11, 0
+        cneg    x23, x23, lt    // x23 = dy < 0 ? -1 : 1
+        lsl     x23, x23, 32    // Convert y step to     Q32
+
+        b       draw_line_fixedp__end_slope
+/* end high slope */
+
+
+draw_line_fixedp__end_slope:
+
+
+
+        lsl     x20, x0, 32     // x20 <- x coordinate (Q32)
+        lsl     x21, x1, 32     // x21 <- y coordinate (Q32)
+
+        mov     x24, 1
+        lsl     x24, x24, 31    // x24 <- rounding constant
+
+draw_line_fixedp__next_pixel:
+        /* round x */
+        add     x0, x20, x24    // x0 <- x + "0.5"
+        lsr     x0, x0, 32      // x0 <- round(x)
+
+        /* round y */
+        add     x1, x21, x24    // x1 <- y + "0.5"
+        lsr     x1, x1, 32      // x1 <- round(y)
+
+        mov     x2, x5          // x2 <- framebuffer
+        mov     w3, w4          // w3 <- color
+
+        bl      draw_argb_pixel_at
+
+
+
+        add     x20, x20, x22   // Step x coordinate by x step
+        add     x21, x21, x23   // Step y coordinate by y step
+        subs    x19, x19, 1     // Decrement remaining pixels
+        b.ge    draw_line_fixedp__next_pixel
+
+
+
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
+        ret
+
+
+
+
+
 
 
 .endif
