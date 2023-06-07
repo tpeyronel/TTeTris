@@ -3,10 +3,10 @@
 	.equ BITS_PER_PIXEL, 32
 	.equ BYTES_PER_PIXEL, 4
 	.equ BYTES_PER_PIXEL_SHIFT, 2
-    .equ BYTES_PER_SCREEN_ROW, SCREEN_WIDTH * BYTES_PER_PIXEL
+	.equ BYTES_PER_SCREEN_ROW, SCREEN_WIDTH * BYTES_PER_PIXEL
 
-	.equ MOVEMENT_PER_STEP,			20
-	.equ SQUARE_SIZE,				20
+	.equ MOVEMENT_PER_STEP,		20
+	.equ SQUARE_SIZE,		20
 
 	.equ BOARD_WIDTH,               10
 	.equ BOARD_HEIGHT,              20
@@ -20,7 +20,7 @@
 
 	.equ NUM_TETROMINOS,                    7
 
-	.equ TETROMINO_ID_BIAS,					1
+	.equ TETROMINO_ID_BIAS,			1
 
 
 	.equ GPIO_BASE,                 0x3f200000
@@ -39,8 +39,8 @@
         // .equ GPIO_CLK_CTL_ADDRESS,      0x3f101070
         // .equ GPIO_CLK_DIV,              0x5A0C0000
         // .equ GPIO_CLK_CTL,              0x5A000011
-        .equ MS_PER_STEP,               500
-        .equ US_PER_STEP,               MS_PER_STEP * 1000
+        .equ MS_PER_AUTO_DROP,          500
+        .equ US_PER_AUTO_DROP,          MS_PER_AUTO_DROP * 1000
 
         BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x00F0000F
         BG_COLOR: .dword 0xFFFFFFFF
@@ -53,12 +53,19 @@
         .equ COLLISION_RESULT_EXISTING_BLOCK,   0b10
 
 /* struct GameState */
-        .equ LAST_TICK,                 0                                       // u32
-        .equ INPUT_STATE,               LAST_TICK + 4                         // struct InputState
+        .equ LAST_DROP,                 0                                       // u32
+        .equ GAME_STATS,                LAST_DROP + 4
+        .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE             // struct InputState
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE   // struct TetrominoState
         .equ BOARD_STATE,               TETROMINO_STATE + STRUCT_TSTATE_SIZE    // struct BoardState
 
         .equ STRUCT_GAME_STATE_SIZE,    BOARD_STATE + STRUCT_BSTATE_SIZE
+
+/* struct GameStats */
+        .equ GS_SCORE,                  0                       // u64
+        .equ GS_COMPLETED_ROWS,         GS_SCORE + 8            // u64
+
+        .equ STRUCT_GS_SIZE,            GS_COMPLETED_ROWS + 8
 
 /* struct InputState */
         .equ PRESSED_STATE,             0                       // u32
@@ -76,8 +83,9 @@
 
 /* struct BoardState */
         .equ BSTATE_BOARD,              0                       // u8[22][10] = u8[BOARD_HEIGHT][BOARD_WIDTH]
+		.equ BSTATE_DESTROYED_ROWS,		BSTATE_BOARD + BOARD_SIZE_IN_BYTES	// u8[4]
 
-        .equ STRUCT_BSTATE_SIZE,        BSTATE_BOARD + BOARD_SIZE_IN_BYTES
+        .equ STRUCT_BSTATE_SIZE,        BSTATE_DESTROYED_ROWS + 4
 
 /* struct Tetromino */
         .equ TETROMINO_COLOR,           0                           // u32
@@ -89,6 +97,11 @@
         .equ TDATA,                     0                       // u8[4][4]             [0][0] is bottom left, [0][3] is bottom right
 
         .equ STRUCT_TDATA_SIZE,         TDATA + TETROMINO_BOARD_SIZE_IN_BYTES
+
+
+
+		.equ TICKS_PER_SECOND,          60
+        .equ BACK_BUFFER_ADDRESS,       0x1000000
 
 TETROMINOS:
 /* Tetromino I: */
@@ -265,25 +278,17 @@ TETROMINOS:
  * x26: remaining rows
  * x28 (const): beginning of framebuffer
  */
+game_over:
 main:
-	mov     x28, x0         // Save framebuffer address to x28
+	sub     sp, sp, 8
+	str     x0, [sp]        // Save framebuffer to stack
 
-	// Allocate struct GameState
+	ldr     x28, =BACK_BUFFER_ADDRESS
+
 	sub     sp, sp, STRUCT_GAME_STATE_SIZE
-	// TODO: implement init_game_state subroutine
-	add     x0, sp, INPUT_STATE
-	bl      init_input_state
-	add     x0, sp, TETROMINO_STATE
-	bl      init_tetromino_state
-	add x0, sp, BOARD_STATE
-	bl init_board_state
+	mov     x0, sp
+	bl      init_game_state
 
-
-	stur xzr, [sp, TETROMINO_STATE + TSTATE_ID]
-	stur xzr, [sp, TETROMINO_STATE + TSTATE_ROT]
-	stur xzr, [sp, TETROMINO_STATE + TSTATE_POS_X]
-	mov x0, 16
-	stur x0, [sp, TETROMINO_STATE + TSTATE_POS_Y]
 
 	mov x0, 0
 	mov x1, 0
@@ -296,61 +301,49 @@ main:
 
     add x0, sp, BOARD_STATE
 
-	mov x1, 5
+	mov x1, 0
 	add x1, x1, TETROMINO_ID_BIAS
-    sturb w1, [x0, 30]
-    sturb w1, [x0, 40]
-    sturb w1, [x0, 50]
-    sturb w1, [x0, 60]
+    sturb w1, [x0]
+    sturb w1, [x0, 1]
+    sturb w1, [x0, 2]
+    sturb w1, [x0, 3]
+    sturb w1, [x0, 4]
+    sturb w1, [x0, 5]
+    sturb w1, [x0, 6]
+    sturb w1, [x0, 7]
+    sturb w1, [x0, 8]
 
-	mov x1, 6
+	mov x1, 2
 	add x1, x1, TETROMINO_ID_BIAS
-    sturb w1, [x0, 20]
-    sturb w1, [x0, 21]
-    sturb w1, [x0, 22]
-    sturb w1, [x0, 31]
-
-	mov x1, 1
-	add x1, x1, TETROMINO_ID_BIAS
+    sturb w1, [x0, 10]
+    sturb w1, [x0, 11]
     sturb w1, [x0, 12]
     sturb w1, [x0, 13]
-    sturb w1, [x0, 23]
-    sturb w1, [x0, 33]
-
-	mov x1, 5
-	add x1, x1, TETROMINO_ID_BIAS
     sturb w1, [x0, 14]
     sturb w1, [x0, 15]
     sturb w1, [x0, 16]
     sturb w1, [x0, 17]
+    sturb w1, [x0, 18]
 
-
-	mov x1, 0
+	mov x1, 3
 	add x1, x1, TETROMINO_ID_BIAS
-    sturb w1, [x0]
-    sturb w1, [x0, 1]
-    sturb w1, [x0, 2]
-    sturb w1, [x0, 3]
-    sturb w1, [x0, 4]
-    sturb w1, [x0, 5]
-    sturb w1, [x0, 6]
-    sturb w1, [x0, 7]
-    sturb w1, [x0, 8]
-    sturb w1, [x0, 9]
+    sturb w1, [x0, 20]
+    sturb w1, [x0, 21]
+    sturb w1, [x0, 22]
+    sturb w1, [x0, 23]
+    sturb w1, [x0, 24]
+    sturb w1, [x0, 25]
+    sturb w1, [x0, 26]
+    sturb w1, [x0, 27]
+    sturb w1, [x0, 28]
 
-	add x0, sp, (BOARD_STATE + 190)
-	mov x1, 0
+	mov x1, 4
 	add x1, x1, TETROMINO_ID_BIAS
-    sturb w1, [x0]
-    sturb w1, [x0, 1]
-    sturb w1, [x0, 2]
-    sturb w1, [x0, 3]
-    sturb w1, [x0, 4]
-    sturb w1, [x0, 5]
-    sturb w1, [x0, 6]
-    sturb w1, [x0, 7]
-    sturb w1, [x0, 8]
-    sturb w1, [x0, 9]
+	sturb w1, [x0, 30]
+	sturb w1, [x0, 31]
+	sturb w1, [x0, 32]
+	
+
 
 	add x0, sp, BOARD_STATE
 	mov x1, 1
@@ -376,42 +369,228 @@ main:
 	stur x1, [x0, TSTATE_ID]
 	mov x1, 6
 	stur x1, [x0, TSTATE_POS_X]
-	mov x1, 1
+	mov x1, 14
 	stur x1, [x0, TSTATE_POS_Y]
 	mov x1, 3
 	stur x1, [x0, TSTATE_ROT]
 
-	
 	mov x0, sp
 	mov x1, x28
-	bl draw_game
-
-
-    movz x5, 0x2FFF, lsl 16
-wait:
-    sub x5, x5, 1
-    cbnz x5, wait
-
-    add x0, sp, BOARD_STATE
-    mov x1, 0 
-    bl erase_board_line
+	bl draw_board
 
 	mov x0, sp
 	mov x1, x28
-	bl draw_game
+	bl draw_destroy_particles
+
+		mov     x0, x28
+        ldr     x1, [sp, STRUCT_GAME_STATE_SIZE]        // restore original framebuffer address from stack
+        bl      copy_framebuffer
+
+	movz x0, 0x2fff, lsl 16
+hola:	
+	sub x0, x0, 1
+	cbnz x0, hola
 
 	add x0, sp, BOARD_STATE
-    mov x1, 0 
-    bl fall_one_block
+	mov x1, 0
+	bl update_board
+
+
+	bl get_time
+	add x1, sp, LAST_DROP
+	stur w0, [x1]
+	
+inf:
+	mov x0, 0
+	mov x1, 0
+	mov x2, ( (SCREEN_WIDTH - BOARD_WIDTH * SQUARE_SIZE) / 2 )
+	mov x3, SCREEN_HEIGH-1
+	mov x4, x28
+	mov x5, 0xFFFFFF
+	bl draw_filled_rectangle
+	
+	mov x0, ( (SCREEN_WIDTH - BOARD_WIDTH * SQUARE_SIZE) / 2 )
+	mov x1, SCREEN_WIDTH
+	sub x0, x1, x0
+	mov x1, 0
+	mov x2, SCREEN_WIDTH-1
+	mov x3, SCREEN_HEIGH-1
+	mov x4, x28
+	mov x5, 0xFFFFFF
+	bl draw_filled_rectangle
 
 	mov x0, sp
 	mov x1, x28
-	bl draw_game
+	bl draw_destroy_particles
 
+	mov x0, sp
+	mov x1, x28
+	bl draw_board
 
-inf:	
+	bl get_time
+	ldur w1, [sp, LAST_DROP]
+	sub x1, x0, x1
+	mov x0, MS_PER_AUTO_DROP
+	mov x2, 1000
+	mul x0, x0, x2
+	cmp x1, x0
+
+		mov     x0, x28
+        ldr     x1, [sp, STRUCT_GAME_STATE_SIZE]        // restore original framebuffer address from stack
+        bl      copy_framebuffer
+	b.gt inf2
+
 	b inf
 
+inf2:
+	b inf2
+
+
+/*
+	Params:	
+		x0:	framebuffer
+		x1:	struct GameState*
+*/
+growing_circle_animation:
+	sub sp, sp, 32
+	stur lr, [sp]
+	stur x19, [sp, 8]
+	stur x20, [sp, 16]
+	stur x21, [sp, 24]
+
+	mov x19, x0
+	mov x20, x1
+
+	add x0, x20, LAST_DROP
+	ldur x0, [x0]
+	mov x22, x0
+	mov x1, 0
+
+growing_circle_animation__loop:	
+	//lsr x3, x0, 15 
+	lsr x3, x1, 12
+	mov x2, x19
+	mov x0, 300
+	mov x1, 200
+	mov x4, 0xff0000
+	
+	bl draw_circle_at
+
+	mov x0, x22
+	bl get_elapsed_time
+	ldr w2, =US_PER_AUTO_DROP
+	lsr x2, x2, 1
+	cmp x0, x2
+	mov x1, x0
+	b.lt growing_circle_animation__loop
+
+	ldur lr, [sp]
+	ldur x19, [sp, 8]
+	ldur x20, [sp, 16]
+	ldur x21, [sp, 24]
+	add sp, sp, 32
+
+	br lr
+
+
+/*
+	Params:
+		x0:	in/out struct BoardState*
+		x1:	i64							<- tetromino y position
+	Returns:	
+		x0:	u64							<- number of rows removed
+*/
+update_board:	
+	sub sp, sp, 8
+	stur lr, [sp]
+
+	mov x9, x0
+	mov x10, 0
+
+	mov x2, 4
+	add x0, x9, BSTATE_DESTROYED_ROWS
+	movz x3, 0x00ff, lsl 00
+update_board__reset_destroyed:
+	sturb w3, [x0]
+	add x0, x0, 1
+	sub x2, x2, 1
+	cbz x2, update_board__reset_destroyed
+
+	// x0 = max(x1, 0)
+	cmp x1, 0
+	b.lt update_board__max_branch0
+	mov x0, x1
+	b update_board__next_row
+
+update_board__max_branch0:	
+	mov x0, 0
+
+	// x0 is the row i'm currently checking
+update_board__next_row:	
+	add x2, x1, TETROMINO_BOARD_WIDTH
+	cmp x0, x2
+	b.ge update_board__end
+
+	mov x2, BOARD_WIDTH
+	mul x2, x0, x2
+	add x2, x2, x9			// x2 points to first element of current row
+	
+	mov x3, 0
+
+update_board__next_elem:	
+	add x5, x2, x3
+	ldurb w4, [x5]	// x4 is element of board
+
+	cbz x4, update_board__row_not_complete
+
+	add x3, x3, 1
+	cmp x3, BOARD_WIDTH
+	b.eq update_board__row_complete
+	b update_board__next_elem
+
+update_board__row_complete:
+	add x6, x9, x10
+	add x7, x0, x10
+	sturb w7, [x6, BSTATE_DESTROYED_ROWS]
+	
+	add x10, x10, 1
+
+	sub sp, sp, 32
+	stur x0, [sp]
+	stur x1, [sp, 8]
+	stur x9, [sp, 16]
+	stur x10, [sp, 24]
+
+	mov x1, x0
+	mov x0, x9
+
+	bl erase_board_line
+
+	ldur x1, [sp]
+	ldur x0, [sp, 16]
+
+	bl fall_one_block	
+
+	ldur x0, [sp]
+	ldur x1, [sp, 8]
+	ldur x9, [sp, 16]
+	ldur x10, [sp, 24]
+	add sp, sp, 32
+
+	sub x1, x1, 1
+	b update_board__next_row
+
+update_board__row_not_complete:	
+	add x0, x0, 1
+	b update_board__next_row
+
+update_board__end:
+	ldur lr, [sp]
+	add sp, sp, 8
+
+	mov x0, x10
+	
+	br lr
 
 /*
 	Params:	
@@ -430,12 +609,12 @@ get_tetromino_color:
 
 /*
  * Params:
- *      x0: struct TetrominoState*
+ *      x0: in struct TetrominoState*
  * Returns:
- *		x0: struct TetrominoData*    -> matrix of tetromino
- *		x1: i64                      -> pos x	
- *		x2: i64                      -> pos y
- *		x3: u32                      -> color
+ *	x0: in struct TetrominoData* -> matrix of tetromino
+ *	x1: i64                      -> pos x	
+ *	x2: i64                      -> pos y
+ *	x3: u32                      -> color
  */
 get_tetromino:	
 	mov x4, x0
@@ -444,13 +623,13 @@ get_tetromino:
 	mov x1, STRUCT_TETROMINO_SIZE
 	mul x5, x5, x1						
 	ldr x6, =TETROMINOS
-	add x5, x5, x6					// x5 = TETROMINOS + STRUCT_TETROMINO_SIZE*id
+	add x5, x5, x6				// x5 = TETROMINOS + STRUCT_TETROMINO_SIZE*id
 
 	ldur x6, [x4, TSTATE_ROT]
 	mov x0, STRUCT_TDATA_SIZE
 	mul x0, x0, x6
 	add x0, x0, TETROMINO_ROTS
-	add x0, x0, x5					// x0 = x5 + TETROMINO_ROTS + STRUCT_TDATA_SIZE*TSTATE_ROT
+	add x0, x0, x5				// x0 = x5 + TETROMINO_ROTS + STRUCT_TDATA_SIZE*TSTATE_ROT
 
 	ldur x1, [x4, TSTATE_POS_X]
 
@@ -471,7 +650,7 @@ init_game_state:
         mov     x19, x0                 // x19 <- game_state
 
         bl      get_time
-        str     w0, [x19, LAST_TICK]
+        str     w0, [x19, LAST_DROP]
 
         add     x0, x19, INPUT_STATE
         bl      init_input_state
@@ -479,8 +658,8 @@ init_game_state:
         add     x0, x19, TETROMINO_STATE
         bl      init_tetromino_state
 
-		add		x0, x19, BOARD_STATE
-		bl		init_board_state
+		add	x0, x19, BOARD_STATE
+		bl	init_board_state
 
         ldp     lr, x19, [sp], 16
         ret
@@ -524,19 +703,19 @@ keepgoing:
     add x5, x15, 10		// cambié de sub a add porque ahora la
 						// board crece de más abajo a más arriba
 
-    ldur x2, [x5]        // get info from square avobe
-    sturb w2, [x15]      // replace current square with new info
+    ldur x2, [x5]         // get info from square avobe
+    sturb w2, [x15]       // replace current square with new info
 
-    add x15, x15, 1      // move on to the next square (-->)
+    add x15, x15, 1       // move on to the next square (-->)
 
     sub x5, x5, x0
     cmp x5, BOARD_SIZE-1
     bne keepgoing         // stop before reaching top line of grid (x15 at square #189, x5 at #199)
-    
+
     mov x1, 19
     sub sp, sp, 8
     stur lr, [sp]
-    bl erase_board_line // Erase anything on top line
+    bl erase_board_line   // Erase anything on top line
     ldur lr, [sp]
     add sp, sp, 8
 
@@ -545,18 +724,37 @@ keepgoing:
 
 /*
 	Params:
-		x0: in/out u8[BOARD_WIDTH][BOARD_HEIGHT]	 
+		x0: in/out u8[BOARD_WIDTH][BOARD_HEIGHT]	
  */
 init_board_state:	
+	sub sp, sp, 8
+	stur x19, [sp]
+	
+	mov x19, x0
+	
+	add x0, x19, BSTATE_BOARD
     mov x2, BOARD_SIZE_IN_BYTES
     create_grid_loop:
     sturb wzr, [x0]
     add x0, x0, 1
     sub x2, x2, 1
-    cbz x2, create_grid_return
+    cbz x2, create_grid_end
     b create_grid_loop
 
-    create_grid_return:
+create_grid_end:	
+	mov x2, 4
+	add x0, x19, BSTATE_DESTROYED_ROWS
+	movz x3, 0x00ff, lsl 00
+init_board_state__destroyed_rows_loop:	
+	sturb w3, [x0]
+	add x0, x0, 1
+	sub x2, x2, 1
+	cbz x2, init_board_state__end
+	b init_board_state__destroyed_rows_loop
+
+init_board_state__end:	
+	ldur x19, [sp]
+	add sp, sp, 8
     br lr
 
 /*
@@ -565,7 +763,7 @@ init_board_state:
 		mut x1: framebuffer address
 	
  */
-draw_game:
+draw_board:
 	sub sp, sp, 40
 	stur lr, [sp]
 	stur x19, [sp, 8]
@@ -575,7 +773,7 @@ draw_game:
 
     add x9, x0, (BOARD_STATE + BSTATE_BOARD)
 
-    mov x11, x1                
+    mov x11, x1
 
 	add x0, x0, TETROMINO_STATE
 	bl get_tetromino
@@ -588,23 +786,23 @@ draw_game:
 
 
     mov x14, 0             // row iterator
-    draw_game_outer:
+    draw_board_outer:
     mov x15, 0             // column iterator
-    draw_game_inner:
+    draw_board_inner:
 
 	cmp x15, x20
-	b.lt draw_game_not_tetromino
+	b.lt draw_board_not_tetromino
 
 	add x12, x20, (TETROMINO_BOARD_WIDTH-1)
 	cmp x15, x12
-	b.gt draw_game_not_tetromino
+	b.gt draw_board_not_tetromino
 
 	cmp x14, x21
-	b.lt draw_game_not_tetromino
+	b.lt draw_board_not_tetromino
 
 	add x12, x21, (TETROMINO_BOARD_WIDTH-1)
 	cmp x14, x12
-	b.gt draw_game_not_tetromino
+	b.gt draw_board_not_tetromino
 	// if I got here, then I'm currently on a square of the tetromino
 	sub x0, x15, x20
 	sub x1, x14, x21
@@ -618,15 +816,15 @@ draw_game:
 
 	ldurb w1, [x0]
 
-	cbz x1, draw_game_not_tetromino		// draw whatever there is in the board
+	cbz x1, draw_board_not_tetromino		// draw whatever there is in the board
 	mov x4, x22
-	b draw_game_no_square
+	b draw_board_no_square
 
 
-draw_game_not_tetromino:	
-	ldurb w12, [x9]		  
+draw_board_not_tetromino:	
+	ldurb w12, [x9]		
     mov x4, 0
-    cbz x12, draw_game_no_square
+    cbz x12, draw_board_no_square
 
     sub x12, x12, TETROMINO_ID_BIAS
 
@@ -636,7 +834,7 @@ draw_game_not_tetromino:
 
     mov x4, x0
 
-    draw_game_no_square:    // draw bakcground
+    draw_board_no_square:    // draw bakcground
     mov x0, x15
     mov x1, x14
     mov x2, SQUARE_SIZE
@@ -651,15 +849,15 @@ draw_game_not_tetromino:
     add x15, x15, 1
     add x9, x9, 1
 	cmp x15, BOARD_WIDTH
-    b.lt draw_game_inner
+    b.lt draw_board_inner
 
     add x14, x14, 1
 	cmp x14, BOARD_HEIGHT
-	b.eq draw_game_end
+	b.eq draw_board_end
 
-    b draw_game_outer
+    b draw_board_outer
 
-    draw_game_end:
+    draw_board_end:
 
 
 	ldur lr, [sp]
@@ -672,6 +870,261 @@ draw_game_not_tetromino:
 
     br lr
 
+
+/*
+ * Params:
+ *      x0: struct GameState*
+ *		x1: framebuffer	
+ */
+draw_destroy_particles:
+	sub sp, sp, 48
+	stur lr, [sp]
+	stur x19, [sp, 8]
+	stur x20, [sp, 16]
+	stur x21, [sp, 24]
+	stur x22, [sp, 32]
+	stur x23, [sp, 40]
+
+	add x19, x0, (BOARD_STATE + BSTATE_DESTROYED_ROWS)
+
+	add x0, x0, LAST_DROP
+	ldur x0, [x0]
+	mov x20, x0
+
+	mov x21, ( (SCREEN_WIDTH - BOARD_WIDTH * SQUARE_SIZE) / 2 )
+	sub x21, x21, SQUARE_SIZE
+	
+	mov x22, ( (SQUARE_SIZE + SCREEN_HEIGH - BOARD_HEIGHT * SQUARE_SIZE) / 2 )
+
+	mov x23, x1
+
+	mov x2, 4
+
+draw_destroy_particles__loop:	
+	ldurb w3, [x19]
+
+	cmp x3, 0xff
+	b.eq draw_destroy_particles__end
+
+	sub sp, sp, 8
+	stur x2, [sp]
+
+	mov x0, x20
+	bl get_elapsed_time
+	lsl x0, x0, 5
+	ldr w2, =US_PER_AUTO_DROP
+	udiv x4, x0, x2
+	mov x5, 1
+	lsl x5, x5, 5
+	sub x5, x5, x4
+	mov x0, 15
+	mul x2, x5, x0
+	lsr x2, x2, 5
+	mov x10, x2
+
+	mov x2, 50
+	mul x4, x4, x2
+	lsr x4, x4, 5
+	mov x11, x4
+
+	
+	sub x0, x21, x11
+	mov x4, SQUARE_SIZE
+	mul x4, x4, x3
+	add x1, x22, x4
+	mov x4, 0xff0000
+	mov x2, x23
+	mov x3, x10
+
+	bl draw_circle_at
+
+	mov x0, SCREEN_WIDTH
+	sub x0, x0, x21
+	add x0, x0, x11
+	mov x4, 0xff0000
+	mov x3, x10
+
+	bl draw_circle_at
+
+	ldur x2, [sp]
+	add sp, sp, 8
+
+	sub x2, x2, 1
+	add x19, x19, 1
+	cbnz x2, draw_destroy_particles__loop
+
+draw_destroy_particles__end:	
+	ldur lr, [sp]
+	ldur x19, [sp, 8]
+	ldur x20, [sp, 16]
+	ldur x21, [sp, 24]
+	ldur x22, [sp, 32]
+	ldur x23, [sp, 40]
+	add sp, sp, 48
+
+	br lr
+
+/*
+ * Params:
+ *      x0: struct GameState*
+ */
+tetromino_fall:
+	sub sp, sp, 56
+	stur lr, [sp]
+	stur x19, [sp, 8]
+	stur x20, [sp, 16]
+	stur x21, [sp, 24]
+	stur x22, [sp, 32]
+	stur x24, [sp, 40]
+	stur x24, [sp, 48]
+
+
+
+	mov x24, x0
+	add x25, x24, LAST_DROP 
+	add x5, x0, TETROMINO_STATE
+
+
+	ldur x19, [x25]                // w19 = last time tetromino moved
+
+	mov     w0, w19
+	bl      get_elapsed_time        // Sets w0, w1
+
+	ldr     w2, =US_PER_AUTO_DROP
+	cmp     w0, w2                         // Check if tetromino should fall
+	b.lt    tetromino_fall__not_yet
+
+        // chequear si me puedo mover para abajo
+        // sí puedo:
+	ldur x2, [x5, TSTATE_POS_Y]
+        sub x2, x2, 1                       // new TSTATE_POS_Y = previous TSTATE_POS_Y - 1
+        sturb w2, [x5, TSTATE_POS_Y]
+        
+        bl get_time
+        stur w0, [x25]                    // set new last movement time to x3
+    
+        // no puedo:
+        // Agregar el tetromino a la matriz de board o decidir si game over
+        add x0, x24, TETROMINO_STATE
+        add x1, x24, BOARD_STATE
+        bl try_place_tetromino
+        
+        // revisar si se completaron filas y actualizar la matriz 
+        mov x0, x24 
+        add x0, x24, BOARD_STATE
+        add x1, x24, (TETROMINO_STATE + TSTATE_POS_Y)
+        ldur x1, [x1]           // x1 = posY of tetromino
+        bl update_board
+        // spawnear nuevo tetromino
+        
+tetromino_fall__not_yet:
+
+	ldur lr, [sp]
+	ldur x19, [sp, 8]
+	ldur x20, [sp, 16]
+	ldur x21, [sp, 24]
+	ldur x22, [sp, 32]
+        ldur x24, [sp, 40]
+        stur x25, [sp, 48]
+
+
+        add sp, sp, 56
+
+        br lr
+
+
+
+// Tries to move tetromino one position down. Returns true if successful, false otherwise
+/*
+ * Params:
+ *      x0: in/out struct TetrominoState*
+ *      x1: in struct BoardState*
+ * Returns:
+ *      x0: bool
+ */
+try_drop_tetromino:
+
+// Tries to place tetromino in its current position. Returns true if successful, GAME OVER otherwise
+// INTENDED USE: COLLISION CHECK POSITIVE & PLACE TETROMINO NEGATIVE => GAME OVER
+//               COLLISION CHECK POSITIVE & PLACE TETROMINO => SELECT NEXT TETROMINO TO DROP
+/*
+ * Params:
+ *      x0: in struct TetrominoState*
+ *      x1: in/out struct BoardState*
+ * Returns:
+ *      x0: bool
+ */
+try_place_tetromino:
+	sub sp, sp, 56
+	stur lr, [sp]
+	stur x19, [sp, 8]
+	stur x20, [sp, 16]
+	stur x21, [sp, 24]
+	stur x22, [sp, 32]
+        stur x23, [sp, 40]
+        stur x24, [sp, 48]
+
+        bl get_tetromino 
+/*	CURRENT KNOWN DATA
+ *      x0: in struct TetrominoData* -> matrix of tetromino
+ *	x1: i64                      -> pos x	
+ *	x2: i64                      -> pos y
+ *	x3: u32                      -> color
+*/
+        mov x20, x1
+
+        mov x21, BOARD_WIDTH
+        mul x22, x2, x21
+        add x22, x22, x1
+
+        sub x21, x21, TETROMINO_ID_BIAS   // Tetromino Matrix's bottom left on BoardState = Y*10 + X - 1
+
+        // Check overlap and place on Board or GAME OVER.
+try_place_tetromino__bigloop:
+        add x21, x21, (BOARD_WIDTH-TETROMINO_BOARD_WIDTH)  // Jump to next Tetromino Matrix's Line.
+        mov x24, 1
+try_place_tetromino__loop:
+        ldurb w23, [x21]
+
+        cmp x23, BG_COLOR
+        b.eq try_place_tetromino__place_cell  // If grid's cell IS available, replace it with Tetromino's cell & move on.
+
+        ldurb w24, [x0]
+        cmp x24, BG_COLOR    // If grid cell IS NOT available && Tetromino Matrix's cell IS empty, move on.
+        b.eq try_place_tetromino__next_cell
+
+        b game_over          // If grid cell IS NOT available && Tetromino Matrix's cell IS NOT empty, then game is over.
+
+try_place_tetromino__place_cell: 
+        stur x0, [x21]       // place valid Tetromino Matrix's cell into it's corresponding BoardState position.
+
+try_place_tetromino__next_cell: 
+        add x0, x0, 1        // move to next Tetromino Matrix cell.
+        add x21, x21, 1      // move to next board cell.
+        add x24, x24, 1      // move count per line.
+
+        cmp x0, TETROMINO_BOARD_SIZE
+        b.eq try_place_tetromino__end  // If x0 reached the end, then game IS NOT over and BoardState is Updated.
+
+        cmp x24, 4    // if tetromino matrix line is done, jump to next line.
+        b.eq try_place_tetromino__bigloop
+
+
+try_place_tetromino__end:
+        mov x0, 1
+	ldur lr, [sp]
+	ldur x19, [sp, 8]
+	ldur x20, [sp, 16]
+	ldur x21, [sp, 24]
+	ldur x22, [sp, 32]
+        ldur x23, [sp, 40]
+        ldur x24, [sp, 48]
+
+    add sp, sp, 56
+
+    br lr
+
+drop_tetromino_or_end_game:
 
 /*
  * Params:
@@ -1096,7 +1549,7 @@ advance_square_maybe:
         mov     w0, w19
         bl      get_elapsed_time        // Sets w0, w1
 
-        ldr     w2, =US_PER_STEP
+        ldr     w2, =US_PER_AUTO_DROP
         cmp     w0, w2                         // Check if we should move square
         b.lt    advance_square_maybe__end
 
@@ -1367,4 +1820,35 @@ draw_line_high_slope__keep_x:
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 80
+        ret
+
+
+
+
+
+
+
+/*
+ * Params:
+ *      x0: in u32*             <- src framebuffer
+ *      x1: out u32*            <- dst framebuffer
+ */
+copy_framebuffer:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, SCREEN_WIDTH
+        mov     x9, SCREEN_HEIGH
+        mul     x19, x19, x9            // x19 = width * height
+
+copy_framebuffer__next_pixel:
+        ldr     w9, [x0]
+        str     w9, [x1]
+
+        add     x0, x0, BYTES_PER_PIXEL
+        add     x1, x1, BYTES_PER_PIXEL
+        subs    x19, x19, 1
+        b.gt    copy_framebuffer__next_pixel
+
+
+        ldp     lr, x19, [sp], 16
         ret
