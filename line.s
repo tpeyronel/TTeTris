@@ -4,8 +4,6 @@ LINE_S:
         .include "./constants.s"
         .include "./pixel.s"
 
-        .equ ROUNDING_CONSTANT,         1 << 31
-
 /* struct LineIter */
         .equ LINEI_REMAINING,           0                       // u64
         .equ LINEI_X_COORD,             LINEI_REMAINING + 8     // u64 (Q32)
