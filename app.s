@@ -4,6 +4,7 @@
         .include "./line.s"
         .include "./rectangle.s"
         .include "./tetris_cell.s"
+        .include "./triangle.s"
 
         .equ MOVEMENT_PER_STEP,         16
 
@@ -326,6 +327,36 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
         ldr     w4, =0x7F0000FF
         mov     x5, x28
         bl      draw_line_with_iter
+
+
+
+
+
+
+
+        mov     x0, 256
+        mov     x1, 256
+        mov     x2, 8
+        mov     x3, 8
+        mov     x4, 400
+        mov     x5, 8
+        ldr     w6, =0x7F0000FF
+        mov     x7, x28
+        bl      draw_flat_bottom_triangle
+
+
+        mov     x0, 256
+        mov     x1, 256
+        mov     x2, 400
+        mov     x3, 8
+        mov     x4, 480
+        mov     x5, 8
+        ldr     w6, =0x7F00FF00
+        mov     x7, x28
+        bl      draw_flat_bottom_triangle
+
+
+
 
 
 
