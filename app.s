@@ -1,4 +1,5 @@
         .include "./constants.s"
+        .include "./time.s"
         .include "./pixel.s"
         .include "./star.s"
         .include "./line.s"
@@ -32,14 +33,6 @@
         .equ GPIO_S,                    0b001000        // (GPIO_3)
         .equ GPIO_D,                    0b010000        // (GPIO_4)
         .equ GPIO_SPACE,                0b100000        // (GPIO_5)
-        .equ RNG_BASE,                  0x3f104000
-        .equ RNG_NUMBER_ADDRESS,        0x3f104008
-        .equ SYS_TIMER_BASE_ADDRESS,    0x3f003000
-        .equ SYS_TIMER_VALUE_ADDRESS,   0x3f003004      // 32 bit number in microseconds
-        // .equ GPIO_CLK_DIV_ADDRESS,      0x3f101074
-        // .equ GPIO_CLK_CTL_ADDRESS,      0x3f101070
-        // .equ GPIO_CLK_DIV,              0x5A0C0000
-        // .equ GPIO_CLK_CTL,              0x5A000011
         .equ MS_PER_STEP,               250
         .equ US_PER_STEP,               MS_PER_STEP * 1000
 
@@ -801,30 +794,6 @@ skip_circle_pixel:
         ret
 
 
-
-
-
-/*
- * Returns:
- *      w0: current time
- */
-get_time:
-        ldr     x0, =SYS_TIMER_VALUE_ADDRESS
-        ldr     w0, [x0]
-        ret
-
-/*
- * Params:
- *      w0: previous_time
- * Returns:
- *      w0: elapsed_time
- *      w1: current_time
- */
-get_elapsed_time:
-        ldr     x1, =SYS_TIMER_VALUE_ADDRESS
-        ldr     w1, [x1]
-        sub     w0, w1, w0
-        ret
 
 
 
