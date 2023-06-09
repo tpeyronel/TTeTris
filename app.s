@@ -38,7 +38,7 @@
         // .equ GPIO_CLK_CTL_ADDRESS,      0x3f101070
         // .equ GPIO_CLK_DIV,              0x5A0C0000
         // .equ GPIO_CLK_CTL,              0x5A000011
-        .equ MS_PER_DROP,               150
+        .equ MS_PER_DROP,               500
         .equ US_PER_AUTO_DROP,          MS_PER_DROP * 1000
 
         BG_COLORS: .word 0x00FF0000, 0x000FF000, 0x0000FF00, 0x00000FF0, 0x000000FF, 0x00F0000F
@@ -206,22 +206,6 @@ main:
 	bl get_time
 	stur w0, [sp, LAST_DROP]
 
-	/*
-inf:
-	mov x0, 0
-	mov x1, 0
-
-	ldr x2, =TETROMINOS	
-
-	mov x3, x28
-	bl draw_tetris_cell
-
-	mov     x0, x28
-	ldr     x1, [sp, STRUCT_GAME_STATE_SIZE]        // restore original framebuffer address from stack
-	bl      copy_framebuffer
-	b inf
-	*/
-
 justfall2:
 	mov x0, sp
 	mov x1, x28
@@ -246,8 +230,16 @@ justfall:
 	bl draw_board
 
 	mov     x0, x28
-	ldr     x1, [sp, STRUCT_GAME_STATE_SIZE]        // restore original framebuffer address from stack
+	ldr     x1, [sp, STRUCT_GAME_STATE_SIZE]    // restore original framebuffer address from stack
 	bl      copy_framebuffer
+
+	add x0, sp, INPUT_STATE
+	bl read_input   // Constantly read input
+
+	add x0, sp, INPUT_STATE
+	add x1, sp, TETROMINO_STATE
+	add x2, sp, BOARD_STATE
+	bl process_input
 
 	b justfall
 
@@ -620,6 +612,8 @@ tetromino_fall:
 	cmp     x0, x9                         // Check time to see if tetromino should fall
 	b.lt    tetromino_fall__end
 
+	stur x1, [x19, LAST_DROP]      // update LAST_DROP with LAST ATTEMPTED DROP time.
+
 	// am, destruir las partículas que haya
 	sub sp, sp, 16
 	stur x0, [sp]	
@@ -629,9 +623,6 @@ tetromino_fall:
 	ldur x0, [sp]
 	ldur x1, [sp, 8]	
 	add sp, sp, 16
-
-
-	stur    x1, [x19, LAST_DROP]      // update LAST_DROP with LAST ATTEMPTED DROP(?) time.
 
 	// Try to drop tetromino 1 block. Don't move if not possible.
 	add x0, x19, TETROMINO_STATE 
@@ -1022,12 +1013,11 @@ check_collision__bigloop:
         add x22, x22, (BOARD_WIDTH-TETROMINO_BOARD_WIDTH)  // Jump to next Tetromino Matrix's Line.
         mov x24, 0
 check_collision__loop:
-        ldurb w23, [x22]
-
         ldurb w19, [x0]
         cmp x19, 0             // If Tetromino Matrix's cell IS empty, move on.
         b.eq check_collision__next_cell
 
+        ldurb w23, [x22]
         cmp x23, 0
         b.eq check_collision__next_cell  // If Tetromino Matrix's cell IS NOT empty but grid's cell IS available, move on.
 
@@ -1323,6 +1313,7 @@ read_input:
  * Params:
  *      x0: const struct InputState*
  *      x1: mut struct TetrominoState*
+ *		x2: const struct BoardState*      // Para chequear colision en los handle
  */
 process_input:
         stp     lr, x19, [sp, -32]!
@@ -1331,7 +1322,7 @@ process_input:
         mov     x19, x0         // x19 = const struct InputState*
         mov     x20, x1         // x20 = mut struct TetrominoState*
 
-        ldr     w0, [x19, PRESSED_STATE]
+        ldr     w0, [x19, ON_PRESS_STATE]
         mov     x1, x20
 
         bl      handle_w
@@ -1348,19 +1339,33 @@ process_input:
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
+ *		x2: const struct BoardState*
  */
 handle_w:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x0, GPIO_W
+	    and     x19, x0, GPIO_W
         cbz     x19, handle_w__end
 
-        ldr     x19, [x1, TSTATE_POS_Y]
-        cmp     x19, (BOARD_HEIGHT - 1)   // Check if player is touching top edge
-        b.eq    handle_w__end
+        ldr     x19, [x1, TSTATE_ROT]
 
-        add     x19, x19, 1               // Move player one position up
-        str     x19, [x1, TSTATE_POS_Y]
+        add     x19, x19, #1
+        cmp     x19, 4
+        csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 4
+
+        str     x19, [x1, TSTATE_ROT]
+
+		mov x0, x1
+		mov x1, x2
+		bl check_collision
+		cbz x0, handle_w__end
+        // SI HAY COLISION TRAS ROTAR, REVERTIR LOS CAMBIOS
+		sub     x19, x19, #1
+        cmp     x19, -1
+        csel    x19, x19, xzr, lt         // Set x19 to 4 if it's equal to -1
+
+        str     x19, [x1, TSTATE_ROT]
+
 
 handle_w__end:
         ldp     lr, x19, [sp], 16
@@ -1390,19 +1395,86 @@ handle_s__end:
 
 /*
  * Params:
+ *      x0: struct TetrominoState*
+ * Returns:
+ *		x0: bool (1 if player touches left edge)
+ */
+check_player_left_edge:	
+	sub sp, sp, 16
+	stur x19, [sp]
+	stur x20, [sp, 8]
+
+	ldur x19, [x0, TSTATE_POS_X]
+	cmp x19, 0
+	b.gt check_player_left_edge__false
+
+	mov x1, TETROMINO_BOARD_WIDTH
+	sub x1, x1, 1
+	sub x1, xzr, x1
+	cmp x19, x1
+	b.le check_player_left_edge__true
+
+	ldur x20, [x0, TSTATE_ID]	
+	mov x1, STRUCT_TETROMINO_SIZE
+	mul x20, x20, x1
+	ldr x1, =TETROMINOS
+	add x20, x20, x1
+	ldur x1, [x0, TSTATE_ROT]
+	mov x0, STRUCT_TDATA_SIZE
+	mul x1, x0, x1
+	add x20, x20, x1
+
+	sub x0, xzr, x19
+	add x0, x0, x20
+	mov x1, TETROMINO_BOARD_WIDTH
+
+check_player_left_edge__loop:	
+	ldurb w2, [x0]
+	cbnz w2, check_player_left_edge__true
+
+	sub x1, x1, 1
+	add x0, x0, TETROMINO_BOARD_WIDTH
+
+	cbnz x1, check_player_left_edge__loop
+
+check_player_left_edge__false:
+	movz x0, 0x0, lsl 00
+	b check_player_left_edge__end
+
+check_player_left_edge__true:
+	movz x0, 0x1, lsl 00
+
+check_player_left_edge__end:
+	ldur x19, [sp]
+	ldur x20, [sp, 8]
+	add sp, sp, 16
+
+	br lr
+/*
+ * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
+ *		x2: const struct BoardState*
  */
 handle_a:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x0, GPIO_A
+	    and     x19, x0, GPIO_A
         cbz     x19, handle_a__end
 
-        ldr     x19, [x1, TSTATE_POS_X]
-        cmp     x19, 0                          // Check if player is touching left edge
+		sub sp, sp, 8
+		stur x1, [sp]
+
+		mov x0, x1
+		bl check_player_left_edge
+
+		ldur x1, [sp]
+		add sp, sp, 8
+	
+        cmp     x0, 1                         // Check if player is touching left edge
         b.eq    handle_a__end
 
+		ldur x19, [x1, TSTATE_POS_X]
         sub     x19, x19, 1                     // Move player one position left
         str     x19, [x1, TSTATE_POS_X]
 
@@ -1414,18 +1486,27 @@ handle_a__end:
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
+ *		x2: const struct BoardState*
  */
 handle_d:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x0, GPIO_D
+		and     x19, x0, GPIO_D
         cbz     x19, handle_d__end
 
         ldr     x19, [x1, TSTATE_POS_X]
-        cmp     x19, (BOARD_WIDTH - 1)         // Check if player is touching right edge
+        cmp     x19, (BOARD_WIDTH - 3)         // Check if player is touching right edge
         b.eq    handle_d__end
 
         add     x19, x19, 1                     // Move player one position right
+        str     x19, [x1, TSTATE_POS_X]
+
+		mov x0, x1
+		mov x1, x2
+		bl check_collision    
+		cbz x0, handle_d__end
+
+        sub     x19, x19, 1                     // Move player one position right
         str     x19, [x1, TSTATE_POS_X]
 
 handle_d__end:
@@ -1446,7 +1527,7 @@ handle_space:
         ldr     x19, [x1, TSTATE_ID]
 
         add     x19, x19, #1
-        cmp     x19, 6
+        cmp     x19, 7
         csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 6
 
         str     x19, [x1, TSTATE_ID]
