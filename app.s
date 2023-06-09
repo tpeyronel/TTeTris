@@ -169,6 +169,30 @@ main:
         mov     x0, sp
         bl      init_game_state
 
+
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, 128
+        mov     x2, 64
+        mov     x3, 32
+        ldr     w4, =0xFFFF00FF
+        bl      particle_manager_create_star
+
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, 105
+        mov     x2, 179
+        mov     x3, 24
+        ldr     w4, =0xFF00FFFF
+        bl      particle_manager_create_star
+
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, 417
+        mov     x2, 78
+        mov     x3, 64
+        ldr     w4, =0xFF00FF00
+        bl      particle_manager_create_star
+
+
+
 	// Set GPIOs 0..9 to read
 	mov     x9, GPIO_BASE
 	str     wzr, [x9, GPIO_GPFSEL0]
@@ -226,6 +250,10 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 	sub     x26, x26, 1             // Decrement remaining rows
 	cbnz    x26, next_row           // If not at last row, draw next row
         /* Finished drawing background */
+
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, x28
+        bl      particle_manager_render
 
         // mov     x0, 16
         // mov     x1, 16
@@ -491,6 +519,9 @@ init_game_state:
 
         add     x0, x19, CHOOSER_BAG_STATE
         bl      recreate_chooser_bag
+
+        add     x0, x19, PARTICLE_MANAGER
+        bl      particle_manager_init
 
         ldp     lr, x19, [sp], 16
         ret
