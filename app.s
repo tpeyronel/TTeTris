@@ -6,6 +6,7 @@
         .include "./rectangle.s"
         .include "./tetris_cell.s"
         .include "./triangle.s"
+        .include "./particle.s"
 
         .equ MOVEMENT_PER_STEP,         16
 
@@ -64,8 +65,9 @@
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
         .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
         .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
+        .equ PARTICLE_MANAGER,          BOARD_STATE + STRUCT_BSTATE_SIZE                // struct ParticleManager
 
-        .equ STRUCT_GAME_STATE_SIZE,    BOARD_STATE + STRUCT_BSTATE_SIZE
+        .equ STRUCT_GAME_STATE_SIZE,    PARTICLE_MANAGER + STRUCT_PM_SIZE
 
 /* struct GameStats */
         .equ GS_SCORE,                  0                       // u64
@@ -155,13 +157,15 @@ DIGITS_FONT:
  */
 main:
         sub     sp, sp, 8
+        // TODO: clean framebuffer saving
         str     x0, [sp]        // Save framebuffer to stack
 
 	// mov     x28, x0         // Save framebuffer address to x28
         ldr     x28, =BACK_BUFFER_ADDRESS
 
         // Allocate and init struct GameState
-        sub     sp, sp, STRUCT_GAME_STATE_SIZE
+        mov     x9, STRUCT_GAME_STATE_SIZE
+        sub     sp, sp, x9
         mov     x0, sp
         bl      init_game_state
 
@@ -421,7 +425,8 @@ cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
 
         /* Copy back buffer to real framebuffer */
         mov     x0, x28
-        ldr     x1, [sp, STRUCT_GAME_STATE_SIZE]        // restore original framebuffer address from stack
+        mov     x9, STRUCT_GAME_STATE_SIZE
+        ldr     x1, [sp, x9]                    // restore original framebuffer address from stack
         bl      copy_framebuffer
 
 game_loop__sleep:

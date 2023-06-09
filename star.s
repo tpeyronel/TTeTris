@@ -1,5 +1,5 @@
 .ifndef STAR_S
-STARS_S:
+STAR_S:
 
 .include "./constants.s"
 .include "./line.s"
