@@ -1477,7 +1477,7 @@ handle_space:
         ldr     x19, [x1, TSTATE_ID]
 
         add     x19, x19, #1
-        cmp     x19, 6
+        cmp     x19, 7
         csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 6
 
         str     x19, [x1, TSTATE_ID]
