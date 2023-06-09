@@ -7,6 +7,7 @@
         .include "./tetris_cell.s"
         .include "./triangle.s"
         .include "./particle.s"
+        .include "./util.s"
 
         .equ MOVEMENT_PER_STEP,         16
 
@@ -1447,6 +1448,8 @@ draw_decimal_digit_with_thickness__skip_seg_6:
 draw_time:
         stp     lr, x19, [sp, -16]!
 
+        mov     x19, x3         // x19 <- framebuffer
+
         sub     sp, sp, STRUCT_DNI_SIZE
 
         str     x0, [sp, DNI_POS_X]
@@ -1465,10 +1468,23 @@ draw_time:
         mov     w9, 1000
         udiv    w0, w0, w9      // w0 <- time in milliseconds
 
+
+
+
+        lsl     x0, x0, 32      // x0 <- time in milliseconds   (Q32)
+        udiv    x0, x0, x9      // x0 <- time in seconds        (Q32)
+        bl      sine_wave
+        mov     x9, 1000
+        mul     x0, x0, x9      // x0 <- number between 0 and 1000 (Q32)
+        asr     x0, x0, 32      // x0 <- number between 0 and 1000
+
+
+
+
         str     x0, [sp, DNI_VALUE]
 
         mov     x0, sp
-        mov     x1, x3          // x1 <- beginning of framebuffer
+        mov     x1, x19          // x1 <- beginning of framebuffer
         bl      draw_number
 
         add     sp, sp, STRUCT_DNI_SIZE
