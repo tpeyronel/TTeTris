@@ -1401,10 +1401,12 @@ handle_w__end:
  *		x2: in struct BoardState*
  */
 handle_s:
-	sub sp, sp, 24
+	sub sp, sp, 40
 	stur lr, [sp]
 	stur x19, [sp, 8]
 	stur x20, [sp, 16]
+	stur x21, [sp, 24]
+	stur x22, [sp, 32]
 
 	and     x19, x0, GPIO_S
 	cbz     x19, handle_s__end
@@ -1414,12 +1416,18 @@ handle_s:
 	mov x0, x1
 	mov x1, x2
 
+handle_s__loop:	
 	ldur x19, [x20, TSTATE_POS_Y]
 	sub x19, x19, 1
 	stur x19, [x20, TSTATE_POS_Y]
 
+	mov x21, x0
+	mov x22, x1
 	bl check_collision
-	cbz x0, handle_s__end
+	mov x2, x0
+	mov x0, x21
+	mov x1, x22
+	cbz x2, handle_s__loop
 
 	ldur x19, [x20, TSTATE_POS_Y]
 	add x19, x19, 1
@@ -1429,7 +1437,9 @@ handle_s__end:
 	ldur lr, [sp]
 	ldur x19, [sp, 8]
 	ldur x20, [sp, 16]
-	add sp, sp, 24
+	ldur x21, [sp, 24]
+	ldur x22, [sp, 32]
+	add sp, sp, 40
 	ret
 
 /*
