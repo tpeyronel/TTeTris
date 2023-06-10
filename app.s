@@ -5,7 +5,7 @@
 
         .equ MOVEMENT_PER_STEP,         20
 
-        .equ SQUARE_SIZE,               20
+        .equ SQUARE_SIZE,               21
 
 		.equ DESTROY_PARTICLE_RADIUS,	10
 
@@ -56,8 +56,9 @@
         .equ GAME_STATS,                LAST_DROP + 4
         .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE             // struct InputState
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE   // struct TetrominoState
-        .equ BOARD_STATE,               TETROMINO_STATE + STRUCT_TSTATE_SIZE    // struct BoardState      
-        
+        .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
+        .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
+
         .equ STRUCT_GAME_STATE_SIZE,    BOARD_STATE + STRUCT_BSTATE_SIZE
 
 /* struct GameStats */
@@ -71,6 +72,12 @@
         .equ ON_PRESS_STATE,            PRESSED_STATE + 4       // u32
 
         .equ STRUCT_INPUT_STATE_SIZE,   ON_PRESS_STATE + 4
+
+/* struct ChooserBagState */
+        .equ CBAG_REMAINING,            0                       // u8
+        .equ CBAG_VALUES,               CBAG_REMAINING + 1      // u8[7] = u8[NUM_TETROMINOS]
+
+        .equ STRUCT_CBAG_STATE_SIZE,    CBAG_VALUES + (NUM_TETROMINOS * 1)
 
 /* struct TetrominoState */
         .equ TSTATE_ID,                 0                       // u64
@@ -87,6 +94,41 @@
         .equ STRUCT_BSTATE_SIZE,        BSTATE_DESTROYED_ROWS + 4
 
 
+/* struct DrawNumberInfo */
+        .equ DNI_POS_X,                 0                       // u64
+        .equ DNI_POS_Y,                 DNI_POS_X + 8           // u64
+        .equ DNI_VALUE,                 DNI_POS_Y + 8           // u64
+        .equ DNI_MAX_DIGITS,            DNI_VALUE + 8           // u64
+        .equ DNI_DIGIT_WIDTH,           DNI_MAX_DIGITS + 8      // u64
+        .equ DNI_DIGIT_THICKNESS,       DNI_DIGIT_WIDTH + 8     // u64
+        .equ DNI_DIGIT_SPACING,         DNI_DIGIT_THICKNESS + 8 // u64
+        .equ DNI_COLOR,                 DNI_DIGIT_SPACING + 8   // u32
+
+        .equ STRUCT_DNI_SIZE,           DNI_COLOR + 4
+
+/* Data for drawing 7-segment decimal digits */
+/* u32[10] */
+DIGITS_FONT:
+/* Digit 0: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 1: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_5
+/* Digit 2: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 3: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 4: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5
+/* Digit 5: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_6
+/* Digit 6: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_6
+/* Digit 7: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 8: */
+        .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit 9: */
+        .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
 
 /*
  * x19: framebuffer address (could be x9-15 ?)
@@ -109,34 +151,22 @@ main:
 	// Allocate struct GameState
 	sub     sp, sp, STRUCT_GAME_STATE_SIZE
 	// TODO: implement init_game_state subroutine
-	add     x0, sp, INPUT_STATE
-	bl      init_input_state
-	add     x0, sp, TETROMINO_STATE
-	bl      init_tetromino_state
-	add x0, sp, BOARD_STATE
-	bl init_board_state
-
+	bl init_game_state
 
 	mov x0, 0
 	mov x1, 0
 	mov x2, SCREEN_WIDTH-1
 	mov x3, SCREEN_HEIGH-1
 	mov x4, x28
-	mov x5, 0xFFFFFF
+	mov x5, 0x00008b
 	bl draw_filled_rectangle
 
-
-    add x0, sp, BOARD_STATE
-
-	add x0, sp, TETROMINO_STATE
-	mov x1, 4
-	stur x1, [x0, TSTATE_ID]
-	mov x1, 7
-	stur x1, [x0, TSTATE_POS_X]
-	mov x1, 14
-	stur x1, [x0, TSTATE_POS_Y]
-	mov x1, 1
-	stur x1, [x0, TSTATE_ROT]
+	add x0, sp, CHOOSER_BAG_STATE
+    bl recreate_chooser_bag
+	
+	add x0, sp, CHOOSER_BAG_STATE
+	bl choose_next_tetromino
+	sturb w0, [sp, TETROMINO_STATE + TSTATE_ID]  // Set first tetromino.
 
 	bl get_time
 	stur w0, [sp, LAST_DROP]
@@ -180,15 +210,13 @@ justfall:
 
 newTetro:
 	add x0, sp, TETROMINO_STATE
-	mov x1, 3
-	stur x1, [x0, TSTATE_ID]
-	mov x1, 4
-	stur x1, [x0, TSTATE_POS_X]
-	mov x1, 16
-	stur x1, [x0, TSTATE_POS_Y]
-	mov x1, 2
-	stur x1, [x0, TSTATE_ROT]
+	bl init_tetromino_state
 
+	add x0, sp, CHOOSER_BAG_STATE
+	bl choose_next_tetromino
+
+	sturb w0, [sp, TETROMINO_STATE + TSTATE_ID]  // Start with new tetromino.
+	
 	b justfall2
 
 	b game_over
@@ -265,8 +293,11 @@ init_game_state:
         add     x0, x19, TETROMINO_STATE
         bl      init_tetromino_state
 
-	add	x0, x19, BOARD_STATE
-	bl	init_board_state
+		add		x0, x19, BOARD_STATE
+		bl		init_board_state
+
+		add 	x0, x19, GAME_STATS
+		bl 		init_game_stats
 
         ldp     lr, x19, [sp], 16
         ret
@@ -577,6 +608,15 @@ tetromino_fall:
 	ldur x1, [x1]                                  // x1 = posY of tetromino
 	bl update_board
 
+	ldur x1, [x19, GAME_STATS + GS_COMPLETED_ROWS] 
+	add x1, x0, x1                                   // Update completed rows
+	ldur x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
+
+    mov     x0, 638
+    mov     x1, 1
+    bl      draw_number
+
+
 	mov x0, 1
 	b tetromino_fall__fullend
         // Spawn new Tetromino at the top.
@@ -610,7 +650,7 @@ erase_destroy_particles:
 	mov x2, ( (SCREEN_WIDTH - BOARD_WIDTH * SQUARE_SIZE) / 2 )
 	mov x3, SCREEN_HEIGH-1
 	mov x4, x28
-	mov x5, 0xFFFFFF
+	mov x5, 0x00008b
 	bl draw_filled_rectangle
 	
 	mov x0, ( (SCREEN_WIDTH - BOARD_WIDTH * SQUARE_SIZE) / 2 )
@@ -620,7 +660,7 @@ erase_destroy_particles:
 	mov x2, SCREEN_WIDTH-1
 	mov x3, SCREEN_HEIGH-1
 	mov x4, x28
-	mov x5, 0xFFFFFF
+	mov x5, 0x00008b
 	bl draw_filled_rectangle
 
 	ldur lr, [sp]
@@ -874,13 +914,22 @@ init_input_state:
 
 /*
  * Params:
+ *      x0: mut struct GameStats*
+ */
+init_game_stats:
+	stur xzr, [x0, GS_SCORE]
+	stur xzr, [x0, GS_COMPLETED_ROWS]
+	ret
+
+/*
+ * Params:
  *      x0: mut struct TetrominoState*
  */
 init_tetromino_state:
         stur    xzr, [x0, TSTATE_ID]
-        mov     x9, (SCREEN_WIDTH / 2)
+        mov     x9, (BOARD_WIDTH/2 - 1)
         stur    x9, [x0, TSTATE_POS_X]
-        mov     x9, (SCREEN_HEIGH / 2)
+        mov     x9, (BOARD_HEIGHT - 4)
         stur    x9, [x0, TSTATE_POS_Y]
         stur    xzr, [x0, TSTATE_ROT]
         ret
@@ -1253,7 +1302,7 @@ read_input:
  * Params:
  *      x0: const struct InputState*
  *      x1: mut struct TetrominoState*
- *		x2: const struct BoardState*      // Para chequear colision en los handle
+ *		x2: const struct BoardState*      // Para chequear colision en los handle (MEJORARLO)
  */
 process_input:
         stp     lr, x19, [sp, -32]!
@@ -1261,6 +1310,7 @@ process_input:
 
         mov     x19, x0         // x19 = const struct InputState*
         mov     x20, x1         // x20 = mut struct TetrominoState*
+		mov 	x21, x2         // x21 = const struct BoardState*
 
         ldr     w0, [x19, ON_PRESS_STATE]
         mov     x1, x20
@@ -1279,10 +1329,13 @@ process_input:
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
- *		x2: const struct BoardState*
+ *		x2: in struct BoardState*
  */
 handle_w:
         stp     lr, x19, [sp, -16]!
+
+		mov x20, x0
+		mov x21, x1
 
 	    and     x19, x0, GPIO_W
         cbz     x19, handle_w__end
@@ -1293,18 +1346,18 @@ handle_w:
         cmp     x19, 4
         csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 4
 
-        str     x19, [x1, TSTATE_ROT]
+        str     x19, [x21, TSTATE_ROT]
 
-		mov x0, x1
+		mov x0, x21
 		mov x1, x2
 		bl check_collision
 		cbz x0, handle_w__end
-        // SI HAY COLISION TRAS ROTAR, REVERTIR LOS CAMBIOS
+
 		sub     x19, x19, #1
         cmp     x19, -1
         csel    x19, x19, xzr, lt         // Set x19 to 4 if it's equal to -1
 
-        str     x19, [x1, TSTATE_ROT]
+        str     x19, [x21, TSTATE_ROT]
 
 
 handle_w__end:
@@ -1315,11 +1368,15 @@ handle_w__end:
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
+ *		x2: in struct BoardState*
  */
 handle_s:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x0, GPIO_S
+		mov x20, x0
+		mov x21, x1
+
+	    and     x19, x0, GPIO_S
         cbz     x19, handle_s__end
 
         ldr     x19, [x1, TSTATE_POS_Y]
@@ -1327,7 +1384,13 @@ handle_s:
         b.eq    handle_s__end
 
         sub     x19, x19, 1               // Move player one position down
-        str     x19, [x1, TSTATE_POS_Y]
+        str     x19, [x21, TSTATE_POS_Y]
+
+		bl check_collision
+		cbz x0, handle_s__end
+
+		add x19, x19, 1
+		str x19, [x21, TSTATE_POS_Y]
 
 handle_s__end:
         ldp     lr, x19, [sp], 16
@@ -1431,23 +1494,26 @@ handle_a__end:
 handle_d:
         stp     lr, x19, [sp, -16]!
 
+		mov x20, x0
+		mov x21, x1
+
 		and     x19, x0, GPIO_D
         cbz     x19, handle_d__end
 
-        ldr     x19, [x1, TSTATE_POS_X]
+        ldr     x19, [x21, TSTATE_POS_X]
         cmp     x19, (BOARD_WIDTH - 3)         // Check if player is touching right edge
         b.eq    handle_d__end
 
         add     x19, x19, 1                     // Move player one position right
-        str     x19, [x1, TSTATE_POS_X]
+        str     x19, [x21, TSTATE_POS_X]
 
-		mov x0, x1
+		mov x0, x21
 		mov x1, x2
 		bl check_collision    
 		cbz x0, handle_d__end
 
         sub     x19, x19, 1                     // Move player one position right
-        str     x19, [x1, TSTATE_POS_X]
+        str     x19, [x21, TSTATE_POS_X]
 
 handle_d__end:
         ldp     lr, x19, [sp], 16
@@ -1563,6 +1629,423 @@ copy_framebuffer__next_pixel:
         subs    x19, x19, 1
         b.gt    copy_framebuffer__next_pixel
 
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+/*
+ * Params:
+ *      x0: out struct ChooserBagState*  <- chooser_bag_state
+ */
+recreate_chooser_bag:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        mov     w19, NUM_TETROMINOS             // x19 <- NUM_TETROMINOS
+        strb    w19, [x0, CBAG_REMAINING]       // chooser_bag_state.remaining = NUM_TETROMINOS
+
+        add     x20, x0, CBAG_VALUES    // x20 = &chooser_bag_state.values[0]
+
+        mov     x21, 0                  // i = 0
+recreate_chooser_bag__init_values:
+        strb    w21, [x20]              // chooser_bag_state.values[i] = i
+        add     x20, x20, 1             // x20 = &chooser_bag_state.values[i + 1] (move to next byte)
+        add     x21, x21, 1             // i += 1
+        cmp     x21, NUM_TETROMINOS     // i < NUM_TETROMINOS ?
+        b.lt    recreate_chooser_bag__init_values
+        /* values == [0, 1, 2, 3, ..., NUM_TETROMINOS - 1] */
+
+
+        add     x20, x0, CBAG_VALUES    // x20 <- pointer to the beginning of the array's segment that remains 'not randomized'
+        mov     w21, NUM_TETROMINOS     // w21 <- amount of remaining (non randomized) tetrominos
+
+recreate_chooser_bag__randomize:
+        /* Gen random number in range [0..rem_tetrominos) */
+        mov     w0, 0
+        mov     w1, w21
+        bl      rand_gen_in_range
+        /* x0 contains random index */
+
+        // Swap a[0] with a[r]
+        add     x9, x20, x0     // x9 = &a[r] = pointer to the randomly chosen element
+        ldrb    w22, [x20]      // w22 = a[0]
+        ldrb    w23, [x9]       // w23 = a[r]
+        strb    w23, [x20]      // a[0] = a[r]
+        strb    w22, [x9]       // a[r] = a[0]
+
+        add     x20, x20, 1             // advance array pointer to the beginning of the next segment
+        subs    w21, w21, 1             // decrement remaining tetrominos
+        b.gt    recreate_chooser_bag__randomize // loop only if more than 1 tetromino is not yet randomized
+        /* values = [randomized] */
+
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct ChooserBagState*  <- chooser_bag_state
+ * Returns:
+ *      x0: u64         <- tetromino_id
+ */
+choose_next_tetromino:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x0         // x19 <- struct ChooserBagState*
+
+        ldrb    w9, [x19, CBAG_REMAINING]               // w9 = chooser_bag_state.remaining
+        cmp     w9, 0                                   // chooser_bag_state.remaining == 0 ?
+        b.gt    choose_next_tetromino__dont_recreate
+        /* Bag out of values, we need to recreate it */
+        mov     x0, x19
+        bl      recreate_chooser_bag
+choose_next_tetromino__dont_recreate:
+
+        /* Load last value and decrement remaining count */
+        ldrb    w9, [x19, CBAG_REMAINING]       // x9 = chooser_bag_state.remaining
+        sub     w9, w9, 1                       // x9 <- index of last element in bag
+        strb    w9, [x19, CBAG_REMAINING]       // chooser_bag_state.remaining -= 1
+        add     x9, x9, CBAG_VALUES             // x9 <- offset to start of array + index of last element
+        add     x9, x19, x9                     // x9 <- pointer to last element of array
+        ldrb    w0, [x9]                        // x0 = chooser_bag_state.values[LAST]
+
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      w0: u32         <- min (inclusive)
+ *      w1: u32         <- max (exclusive)
+ * Returns:
+ *      w0: u32         <- random number in range [min; max)
+ */
+rand_gen_in_range:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        ldr     x19, =RNG_NUMBER_ADDRESS
+        ldr     w19, [x19]              // w19 <- random number in range [0..U32_MAX]
+
+        sub     w20, w1, w0             // w20 <- max - min == length of range
+        udiv    w21, w19, w20           // w21 <- R div (max - min)
+        mul     w21, w21, w20           // w21 <- (R div (max - min)) * (max - min)
+
+        sub     w19, w19, w21           // w19 <- remainder of R / (max - min), in range [0..(max - min))
+        add     w0, w19, w0             //  w0 <- offseted remainder, in range [min..max)
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+/*
+ * Params:
+ *      x0: in/out struct DrawNumberInfo*       <- draw_number_info   (consumed)
+ *      x1: out u8*                             <- beginning of framebuffer
+ */
+draw_number:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        /* (dni.pos_x, dni.pos_y) represents the bottom right coordinate of the drawn number */
+
+        mov     x19, x1                 // const x19 <- beginning of framebuffer
+        mov     x20, x0                 // const x20 <- in/out struct DrawNumberInfo*
+
+        ldr     x9, [x20, DNI_MAX_DIGITS]
+        sub     sp, sp, x9              // Make space for digits array
+        mov     x21, sp                 // x21: const u8* <- pointer to beginning of digits array
+
+        // Convert number to decimal
+        ldr     x0, [x20, DNI_VALUE]    // x0 <- number to draw
+        mov     x1, x21                 // x1 <- pointer to digits array
+        mov     x2, x9                  // x2 <- max digits
+        bl      binary_to_decimal
+
+        mov     x22, x0                 // x22 <- amount of digits to draw (<= max digits)
+
+draw_number__next_digit:
+        ldr     x9, [x20, DNI_POS_X]            // x9 = dni.pos_x
+        ldr     x10, [x20, DNI_DIGIT_WIDTH]     // x10 = dni.digit_width
+        sub     x9, x9, x10                     // x9 -= dni.digit_width <- move x coordinate left by digit width
+        add     x9, x9, 1                       // x9 += 1 <- x coordinate points to bottom left coordinate of digit
+        str     x9, [x20, DNI_POS_X]            // dni.pos_x = x9
+
+        ldr     x0, [x20, DNI_POS_X]            // x0 <- x coordinate
+        ldr     x1, [x20, DNI_POS_Y]            // x1 <- y coordinate
+        ldr     x2, [x20, DNI_DIGIT_WIDTH]      // x2 <- digit width
+        ldr     x3, [x20, DNI_DIGIT_THICKNESS]  // x3 <- thickness
+        ldrb    w4, [x21]                       // w4 <- digits[i]
+        ldr     w5, [x20, DNI_COLOR]            // w5 <- color
+        mov     x6, x19                         // x6 <- beginning of framebuffer
+        bl      draw_decimal_digit_with_thickness // draw digit
+
+        ldr     x9, [x20, DNI_POS_X]            // x9 = dni.pos_x
+        ldr     x10, [x20, DNI_DIGIT_SPACING]   // x10 = dni.digit_spacing
+        sub     x9, x9, x10                     // x9 -= dni.digit_spacing <- move x by digit spacing for drawing next digit
+        sub     x9, x9, 1                       // (off by one)
+        str     x9, [x20, DNI_POS_X]            // dni.pos_x = x9
+        add     x21, x21, 1                     // x21 = &digits[i + 1] <- pointer to next digit
+        subs    x22, x22, 1                     // x22 <- decrement remaining digits and check if any remain
+        b.gt    draw_number__next_digit
+
+        /* All digits are drawn */
+
+        ldr     x9, [x20, DNI_MAX_DIGITS]
+        add     sp, sp, x9              // Pop digits array from stack
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
+        ret
+
+
+/*
+ * Params:
+ *      x0: u64         <- bottom left x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- bottom left y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: u64         <- width  =>  height = 2 * width - (thickness % 2)
+ *      x3: u64         <- thickness
+ *      w4: u8          <- binary digit in range [0..9]
+ *      w5: u32         <- color
+ *      x6: out u8*     <- beginning of framebuffer
+ */
+draw_decimal_digit_with_thickness:
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+        stp     x26, x27, [sp, 64]
+
+        mov     x20, x0                 // x20 <- bottom left x coordinate
+        mov     x21, x1                 // x21 <- bottom left y coordinate
+        mov     w22, w5                 // w22 <- color
+        mov     x23, x6                 // x23 <- beginning of framebuffer
+
+
+        sub     x24, x2, 1              // x24 <- A = width - 1
+        sub     x25, x3, 1              // x25 <- B = thickness - 1
+        lsr     x26, x3, 1              // x26 <- C = thickness / 2
+        add     x27, x24, x26           // x27 <- D = A + C
+
+        sub     sp, sp, 8
+        and     x9, x3, 0b1             // 1 if odd, 0 if even
+        eor     x9, x9, 0b1             // 1 if even, 0 if odd
+        add     x9, x24, x9             // x9 = A + (0|1)
+        sub     x9, x9, x26             // x9 = A - C + (0|1)
+        str     x9, [sp]                // [sp] = A - C + (0|1)
+
+
+
+        ldr     x19, =DIGITS_FONT       // x19 <- pointer to array of digits font
+        lsl     x9, x4, 2               // Convert index (digit) to offset in bytes (u32)
+        add     x19, x19, x9            // x19 <- pointer to data for our digit
+        ldr     w19, [x19]              // w19 <- segment flags of our digit
+
+
+
+
+
+        and     w9, w19, DIGIT_SEGMENT_0
+        cbz     w9, draw_decimal_digit_with_thickness__skip_seg_0
+
+        mov     x0, x20         // x0 <- x
+        mov     x1, x21         // x1 <- y
+        add     x2, x20, x24    // x2 <- x + A
+        add     x3, x21, x25    // x3 <- y + B
+        mov     x4, x23         // x4 <- framebuffer
+        mov     w5, w22         // w5 <- color
+        bl      draw_filled_rectangle
+draw_decimal_digit_with_thickness__skip_seg_0:
+
+
+        and     w9, w19, DIGIT_SEGMENT_1
+        cbz     w9, draw_decimal_digit_with_thickness__skip_seg_1
+
+        mov     x0, x20         // x0 <- x
+        mov     x1, x21         // x1 <- y
+        add     x2, x20, x25    // x2 <- x + B
+        add     x3, x21, x27    // x3 <- y + D
+        mov     x4, x23         // x4 <- framebuffer
+        mov     w5, w22         // w5 <- color
+        bl      draw_filled_rectangle
+draw_decimal_digit_with_thickness__skip_seg_1:
+
+
+        and     w9, w19, DIGIT_SEGMENT_2
+        cbz     w9, draw_decimal_digit_with_thickness__skip_seg_2
+
+        add     x0, x20, x24    // x0 <- x + A
+        sub     x0, x0, x25     // x0 <- x + A - B
+        mov     x1, x21         // x1 <- y
+        add     x2, x20, x24    // x2 <- x + A
+        add     x3, x21, x27    // x3 <- y + D
+        mov     x4, x23         // x4 <- framebuffer
+        mov     w5, w22         // w5 <- color
+        bl      draw_filled_rectangle
+draw_decimal_digit_with_thickness__skip_seg_2:
+
+
+        ldr     x9, [sp]
+        add     x21, x21, x9    // y = y + (A - C + (0|1))
+
+
+        and     w9, w19, DIGIT_SEGMENT_3
+        cbz     w9, draw_decimal_digit_with_thickness__skip_seg_3
+
+        mov     x0, x20         // x0 <- x
+        mov     x1, x21         // x1 <- y
+        add     x2, x20, x24    // x2 <- x + A
+        add     x3, x21, x25    // x3 <- y + B
+        mov     x4, x23         // x4 <- framebuffer
+        mov     w5, w22         // w5 <- color
+        bl      draw_filled_rectangle
+draw_decimal_digit_with_thickness__skip_seg_3:
+
+
+        and     w9, w19, DIGIT_SEGMENT_4
+        cbz     w9, draw_decimal_digit_with_thickness__skip_seg_4
+
+        mov     x0, x20         // x0 <- x
+        mov     x1, x21         // x1 <- y
+        add     x2, x20, x25    // x2 <- x + B
+        add     x3, x21, x24    // x3 <- y + A
+        add     x3, x3, x26     // x3 <- y + A + C
+        mov     x4, x23         // x4 <- framebuffer
+        mov     w5, w22         // w5 <- color
+        bl      draw_filled_rectangle
+draw_decimal_digit_with_thickness__skip_seg_4:
+
+
+        and     w9, w19, DIGIT_SEGMENT_5
+        cbz     w9, draw_decimal_digit_with_thickness__skip_seg_5
+
+        add     x0, x20, x24    // x0 <- x + A
+        sub     x0, x0, x25     // x0 <- x + A - B
+        mov     x1, x21         // x1 <- y
+        add     x2, x20, x24    // x2 <- x + A
+        add     x3, x21, x24    // x3 <- y + A
+        add     x3, x3, x26     // x3 <- y + A + C
+        mov     x4, x23         // x4 <- framebuffer
+        mov     w5, w22         // w5 <- color
+        bl      draw_filled_rectangle
+draw_decimal_digit_with_thickness__skip_seg_5:
+
+
+        ldr     x9, [sp]
+        add     x21, x21, x9    // y = y + (A - C + (0|1))
+
+
+        and     w9, w19, DIGIT_SEGMENT_6
+        cbz     w9, draw_decimal_digit_with_thickness__skip_seg_6
+
+        mov     x0, x20         // x0 <- x
+        mov     x1, x21         // x1 <- y
+        add     x2, x20, x24    // x2 <- x + A
+        add     x3, x21, x25    // x3 <- y + B
+        mov     x4, x23         // x4 <- framebuffer
+        mov     w5, w22         // w5 <- color
+        bl      draw_filled_rectangle
+draw_decimal_digit_with_thickness__skip_seg_6:
+
+        add     sp, sp, 8
+
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
+        ret
+
+/*
+ * Params:
+ *      x0: u64         <- binary number
+ *      x1: out u8*     <- output buffer
+ *      x2: u64         <- buffer length
+ * Returns:
+ *      x0: u64         <- amount of digits of decimal number
+ * Comments:
+ *      Number is converted to binary and written to the buffer pointed by x1,
+ *      where each element represents a decimal digit.
+ *      Least significant digits are written to the beginning of the array.
+ *      E.g.: convert 0xFF to decimal (255)
+ *              -> x1 = [5, 5, 2]
+ */
+binary_to_decimal:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x19, x0                 // x19 <- current dividend
+        mov     x20, 10                 // x20 <- divisor (always 10)
+        mov     x21, 0                  // x21 <- i (current digit, from right to left, used for indexing buffer)
+
+binary_to_decimal__next_digit:
+        cmp     x21, x2                 // check if there is buffer remaining
+        b.ge    binary_to_decimal__end  // break if buffer ended
+
+        udiv    x9, x19, x20            //  x9 <- dividend `div` 10             (quotient)
+        mul     x10, x9, x20            // x10 <- (dividend `div` 10) * 10      (quotient times divisor)
+        sub     x10, x19, x10           // x10 <- remainder of x19 / 10         (remainder, in range [0..9])
+
+        strb    w10, [x1]               // store digit in buffer
+        mov     x19, x9                 // use quotient as new dividend
+        add     x1, x1, 1               // advance pointer to next element
+        add     x21, x21, 1             // increment index
+        cbnz    x19, binary_to_decimal__next_digit      // loop only if new dividend is not 0
+
+binary_to_decimal__end:
+        mov     x0, x21         // x0 <- amount of digits of converted decimal number
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+/* TEST
+ * Params:
+ *      x0: u64         <- bottom right x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- bottom right y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      w2: u32         <- color
+ *      x3: out u8*     <- beginning of framebuffer
+ */
+draw_time:
+        stp     lr, x19, [sp, -16]!
+
+        sub     sp, sp, STRUCT_DNI_SIZE
+
+        str     x0, [sp, DNI_POS_X]
+        str     x1, [sp, DNI_POS_Y]
+        mov     x9, 5
+        str     x9, [sp, DNI_MAX_DIGITS]
+        mov     x9, 33
+        str     x9, [sp, DNI_DIGIT_WIDTH]
+        mov     x9, 8
+        str     x9, [sp, DNI_DIGIT_THICKNESS]
+        mov     x9, 8
+        str     x9, [sp, DNI_DIGIT_SPACING]
+        str     w2, [sp, DNI_COLOR]
+
+        bl      get_time
+        mov     w9, 1000
+        udiv    w0, w0, w9      // w0 <- time in milliseconds
+
+        str     x0, [sp, DNI_VALUE]
+
+        mov     x0, sp
+        mov     x1, x3          // x1 <- beginning of framebuffer
+        bl      draw_number
+
+        add     sp, sp, STRUCT_DNI_SIZE
 
         ldp     lr, x19, [sp], 16
         ret
