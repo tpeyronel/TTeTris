@@ -106,7 +106,7 @@
 /* struct DrawNumberInfo */
         .equ DNI_POS_X,                 0                       // u64
         .equ DNI_POS_Y,                 DNI_POS_X + 8           // u64
-        .equ DNI_VALUE,                 DNI_POS_Y + 8           // u64
+        .equ DNI_VALUE,                 DNI_POS_Y + 8           // i64
         .equ DNI_MAX_DIGITS,            DNI_VALUE + 8           // u64
         .equ DNI_DIGIT_WIDTH,           DNI_MAX_DIGITS + 8      // u64
         .equ DNI_DIGIT_THICKNESS,       DNI_DIGIT_WIDTH + 8     // u64
@@ -142,7 +142,10 @@ DIGITS_FONT:
         .word DIGIT_SEGMENT_0 | DIGIT_SEGMENT_1 | DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
 /* Digit 9: */
         .word DIGIT_SEGMENT_2 | DIGIT_SEGMENT_3 | DIGIT_SEGMENT_4 | DIGIT_SEGMENT_5 | DIGIT_SEGMENT_6
+/* Digit - (minus) (i = 10): */
+        .word DIGIT_SEGMENT_3
 
+        .equ DIGIT_MINUS_INDEX,         10
 
 
 /*
@@ -1111,7 +1114,7 @@ rand_gen_in_range:
 
 /*
  * Params:
- *      x0: u64         <- binary number
+ *      x0: i64         <- binary number
  *      x1: out u8*     <- output buffer
  *      x2: u64         <- buffer length
  * Returns:
@@ -1124,8 +1127,13 @@ rand_gen_in_range:
  *              -> x1 = [5, 5, 2]
  */
 binary_to_decimal:
-        stp     lr, x19, [sp, -32]!
+        stp     lr, x19, [sp, -48]!
         stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        cmp     x0, 0                   // check if x0 is negative
+        cset    x22, lt                 // x22 <- is_negative(x0)
+        cneg    x0, x0, lt              // x0 <- |x0|
 
         mov     x19, x0                 // x19 <- current dividend
         mov     x20, 10                 // x20 <- divisor (always 10)
@@ -1145,11 +1153,19 @@ binary_to_decimal__next_digit:
         add     x21, x21, 1             // increment index
         cbnz    x19, binary_to_decimal__next_digit      // loop only if new dividend is not 0
 
+
+        /* Now we push minus if original number was negative */
+        cbz     x22, binary_to_decimal__end
+        mov     w10, DIGIT_MINUS_INDEX  // w10 <- digit minus index
+        strb    w10, [x1]               // store minus in buffer
+        add     x21, x21, 1             // increment index
+
 binary_to_decimal__end:
         mov     x0, x21         // x0 <- amount of digits of converted decimal number
 
+        ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 32
+        ldp     lr, x19, [sp], 48
         ret
 
 
@@ -1286,7 +1302,7 @@ draw_decimal_digit__skip_seg_6:
  *      x1: u64         <- bottom left y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      x2: u64         <- width  =>  height = 2 * width - (thickness % 2)
  *      x3: u64         <- thickness
- *      w4: u8          <- binary digit in range [0..9]
+ *      w4: u8          <- binary digit in range [0..9] U { 10 (minus) }
  *      w5: u32         <- color
  *      x6: out u8*     <- beginning of framebuffer
  */
