@@ -65,7 +65,8 @@
 
 /* struct GameState */
         .equ LAST_TICK,                 0                                               // u32
-        .equ INPUT_STATE,               LAST_TICK + 4                                   // struct InputState
+        .equ GAME_STATS,                LAST_TICK + 4                                   // struct GameStats
+        .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE                     // struct InputState
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
         .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
         .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
@@ -100,9 +101,10 @@
         .equ STRUCT_CBAG_STATE_SIZE,    CBAG_VALUES + (NUM_TETROMINOS * 1)
 
 /* struct BoardState */
-        .equ BSTATE_BOARD,              0                       // u8[22][10] = u8[BOARD_HEIGHT][BOARD_WIDTH]
+        .equ BSTATE_BOARD,              0                                       // u8[22][10] = u8[BOARD_HEIGHT][BOARD_WIDTH]
+        .equ BSTATE_DESTROYED_ROWS,	BSTATE_BOARD + BOARD_SIZE_IN_BYTES	// u8[4]
 
-        .equ STRUCT_BSTATE_SIZE,        BSTATE_BOARD + BOARD_SIZE_IN_BYTES
+        .equ STRUCT_BSTATE_SIZE,        BSTATE_DESTROYED_ROWS + 4
 
 
 
@@ -501,6 +503,12 @@ init_game_state:
         add     x0, x19, PARTICLE_MANAGER
         bl      particle_manager_init
 
+        add	x0, x19, BOARD_STATE
+        bl	init_board_state
+
+        add 	x0, x19, GAME_STATS
+        bl 	init_game_stats
+
         ldp     lr, x19, [sp], 16
         ret
 
@@ -528,6 +536,57 @@ init_tetromino_state:
         stur    x9, [x0, TSTATE_POS_Y]
         stur    xzr, [x0, TSTATE_ROT]
         ret
+
+
+
+/*
+ * Params:
+ *      x0: out struct BoardState*
+ */
+init_board_state:
+        sub     sp, sp, 8
+        stur    x19, [sp]
+
+        mov     x19, x0             // x19 <- board state
+
+        add     x9, x19, BSTATE_BOARD   // x9 <- u32* pointer to current cell
+        mov     x10, BOARD_SIZE         // x10 <- remaining cells
+
+
+init_board_state__board_loop:
+        sturb   wzr, [x9]
+        add     x9, x9, 1       // Advance board pointer
+        sub     x10, x10, 1     // Decrement remaining cells
+        cbnz    x10, init_board_state__board_loop
+
+
+        add     x9, x19, BSTATE_DESTROYED_ROWS  // x9 <- pointer to destroyed rows array
+        mov     x10, 4                          // x10 <- remaining destroyed rows elements
+        mov     w11, 0xFF
+
+init_board_state__destroyed_rows_loop:
+        sturb   w11, [x9]
+        add     x9, x9, 1
+        sub     x10, x10, 1
+        cbnz    x10, init_board_state__destroyed_rows_loop
+
+
+        ldur    x19, [sp]
+        add     sp, sp, 8
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: out struct GameStats*
+ */
+init_game_stats:
+        stur xzr, [x0, GS_SCORE]
+        stur xzr, [x0, GS_COMPLETED_ROWS]
+        ret
+
+
 
 /*
  * Params:
