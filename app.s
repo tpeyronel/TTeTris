@@ -500,6 +500,10 @@ init_game_state:
         add     x0, x19, CHOOSER_BAG_STATE
         bl      recreate_chooser_bag
 
+        add     x0, x19, CHOOSER_BAG_STATE
+        bl      choose_next_tetromino
+        stur    x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Set first tetromino.
+
         add     x0, x19, PARTICLE_MANAGER
         bl      particle_manager_init
 
