@@ -3,6 +3,7 @@ LINE_S:
 
         .include "./constants.s"
         .include "./pixel.s"
+        .include "./fixed_point.s"
 
 /* struct LineIter */
         .equ LINEI_REMAINING,           0                       // u64

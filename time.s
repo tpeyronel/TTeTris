@@ -3,6 +3,8 @@ TIME_S:
 
         .include "./addresses.s"
 
+        .equ US_PER_SECOND,     1000000
+
 /*
  * Returns:
  *      w0: current time

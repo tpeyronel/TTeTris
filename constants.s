@@ -18,8 +18,6 @@ CONSTANTS_S:
 
         .equ NUM_TETROMINOS,                    7
 
-        .equ ROUNDING_CONSTANT,         1 << 31
-
 
 /* struct Tetromino */
         .equ TETROMINO_DIFFUSE_COLOR,   0                               // u32

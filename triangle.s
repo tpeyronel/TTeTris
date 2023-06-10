@@ -3,6 +3,7 @@ TRIANGLE_S:
 
         .include "./constants.s"
         .include "./pixel.s"
+        .include "./fixed_point.s"
 
 /* struct DrawTriangleInfo */
         .equ DTI_X0,            0               // u64

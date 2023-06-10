@@ -3,6 +3,8 @@ PARTICLE_S:
 
         .include "./time.s"
         .include "./star.s"
+        .include "./util.s"
+        .include "./fixed_point.s"
 
         .equ MAX_PARTICLES,     128
 
@@ -129,9 +131,23 @@ particle_draw:
         mov     x20, x0         // x20 <- particle state
         mov     x21, x1         // x21 <- framebuffer
 
+        bl      get_time
+        lsl     x0, x0, 32              // x0 <- time in us             (Q32)
+        ldr     x9, =US_PER_SECOND
+        udiv    x0, x0, x9              // x0 <- time in seconds        (Q32)
+
+        orr     x1, xzr, 4 << 32        // x1 <- amplitude
+        orr     x2, xzr, 1 << 31        // x2 <- frequency
+        mov     x3, 0                   // x3 <- phase
+        bl      sine_wave_advanced
+
+        q32_to_int      x9, x0, x9      // x9 <- delta size
+
+
         ldr     x0, [x20, PS_POS_X]
         ldr     x1, [x20, PS_POS_Y]
         ldr     x2, [x20, PS_SIZE]
+        add     x2, x2, x9
         ldr     w3, [x20, PS_COLOR]
         mov     x4, x21
         bl      draw_four_point_star
