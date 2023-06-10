@@ -172,6 +172,10 @@ main:
 	// mov     x28, x0         // Save framebuffer address to x28
         ldr     x28, =BACK_BUFFER_ADDRESS
 
+	// Set GPIOs 0..9 to read
+	mov     x9, GPIO_BASE
+	str     wzr, [x9, GPIO_GPFSEL0]
+
         // Allocate and init struct GameState
         mov     x9, STRUCT_GAME_STATE_SIZE
         sub     sp, sp, x9
@@ -201,10 +205,6 @@ main:
         bl      particle_manager_create_star
 
 
-
-	// Set GPIOs 0..9 to read
-	mov     x9, GPIO_BASE
-	str     wzr, [x9, GPIO_GPFSEL0]
 
 
         ldr     w23, BG_COLORS          // w23 <- bg color | default BG_COLORS[0]
@@ -529,10 +529,9 @@ init_input_state:
  */
 init_tetromino_state:
         stur    xzr, [x0, TSTATE_ID]
-        // mov     x9, (SCREEN_WIDTH / 2)
-        mov     x9, 1
+        mov     x9, ((BOARD_WIDTH / 2) - 2)
         stur    x9, [x0, TSTATE_POS_X]
-        mov     x9, (SCREEN_HEIGH / 2)
+        mov     x9, (BOARD_HEIGHT - 4)
         stur    x9, [x0, TSTATE_POS_Y]
         stur    xzr, [x0, TSTATE_ROT]
         ret
