@@ -1,12 +1,13 @@
 .ifndef CONSTANTS_S
 CONSTANTS_S:
 
-	.equ SCREEN_WIDTH,   640
-	.equ SCREEN_HEIGH,   480
-	.equ BITS_PER_PIXEL, 32
-	.equ BYTES_PER_PIXEL, 4
-	.equ BYTES_PER_PIXEL_SHIFT, 2
-        .equ BYTES_PER_SCREEN_ROW, SCREEN_WIDTH * BYTES_PER_PIXEL
+	.equ SCREEN_WIDTH,                      640
+	.equ SCREEN_HEIGH,                      480
+        .equ SCREEN_PIXELS,                     SCREEN_WIDTH * SCREEN_HEIGH
+	.equ BITS_PER_PIXEL,                    32
+	.equ BYTES_PER_PIXEL,                   4
+	.equ BYTES_PER_PIXEL_SHIFT,             2
+        .equ BYTES_PER_SCREEN_ROW,              SCREEN_WIDTH * BYTES_PER_PIXEL
 
         .equ BYTES_PER_TETROMINO_BLOCK,         1
         .equ BYTES_PER_TETROMINO_BLOCK_SHIFT,   0

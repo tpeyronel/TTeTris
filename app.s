@@ -49,6 +49,9 @@
         .equ DIGIT_SEGMENT_6,           1 << 6
 
 
+        .equ BACKGROUND_COLOR,          0xFF00001F
+
+
         BG_COLORS: .word 0x00FF0000, 0x00FFFF00, 0x0000FF00, 0x0000FFFF, 0x000000FF, 0x001E1E1E, 0x00000000
         BG_COLOR: .dword 0xFFFFFFFF
         PLAYER_COLOR: .dword 0xFFFFFFFF
@@ -225,35 +228,8 @@ game_loop:
         bl      index_bg_color
         mov     w23, w0
 
-
-        /* Draw background */
-        mov     x19, x28                // Set x19 to beginning of framebuffer
-	mov     x26, SCREEN_HEIGH       // Set x21 to remaining rows
-next_row:
-	mov     x25, SCREEN_WIDTH       // Set x25 to remaining columns
-next_col:
-        ldr     x9, [sp, TETROMINO_STATE + TSTATE_POS_X]
-        cmp     x25, x9                 // Check if we are in same column as player
-        b.ne    pxl_bg
-        ldr     x9, [sp, TETROMINO_STATE + TSTATE_POS_Y]
-        cmp     x26, x9                 // Check if we are in same row as player
-        b.ne    pxl_bg
-
-pxl_player:
-        stur    w24, [x19]              // Fill pixel with player color
-        b       cont
-
-pxl_bg:
-        stur    w23, [x19]               // Fill pixel with bg color
-
-cont:	add     x19, x19, BYTES_PER_PIXEL // Advance to next framebuffer pixel
-
-	sub     x25, x25, 1             // Decrement remaining columns
-	cbnz    x25, next_col           // If not at end of row, draw next column
-
-	sub     x26, x26, 1             // Decrement remaining rows
-	cbnz    x26, next_row           // If not at last row, draw next row
-        /* Finished drawing background */
+        mov     x0, x28
+        bl      draw_canvas
 
         add     x0, sp, PARTICLE_MANAGER
         mov     x1, x28
@@ -484,9 +460,7 @@ game_loop__sleep:
 copy_framebuffer:
         stp     lr, x19, [sp, -16]!
 
-        mov     x19, SCREEN_WIDTH
-        mov     x9, SCREEN_HEIGH
-        mul     x19, x19, x9            // x19 = width * height
+        ldr     x19, =SCREEN_PIXELS     // x19 = width * height
 
 copy_framebuffer__next_pixel:
         ldr     w9, [x0]
@@ -554,6 +528,28 @@ init_tetromino_state:
         stur    x9, [x0, TSTATE_POS_Y]
         stur    xzr, [x0, TSTATE_ROT]
         ret
+
+/*
+ * Params:
+ *      x0: out u32*    <- framebuffer
+ */
+draw_canvas:
+        stp     lr, x19, [sp, -16]!
+
+        ldr     w9, =BACKGROUND_COLOR   // x9 <- background color
+        ldr     x19, =SCREEN_PIXELS     // x19 = width * height = remaining pixels
+
+draw_canvas__next_pixel:
+        str     w9, [x0]                // Paint pixel with background color
+
+        add     x0, x0, BYTES_PER_PIXEL // Advance framebuffer
+        subs    x19, x19, 1             // Decrement remaining pixels
+        b.gt    draw_canvas__next_pixel // Loop if pixels remain
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
 
 
 /*
