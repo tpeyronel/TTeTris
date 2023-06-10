@@ -156,6 +156,8 @@ main:
 
 	// Allocate struct GameState
 	sub     sp, sp, STRUCT_GAME_STATE_SIZE
+restart:	
+	mov x0, sp
 	// Initialize game state
 	bl init_game_state
 
@@ -1517,12 +1519,28 @@ handle_d__end:
 	ldur x20, [sp, 16]
 	add sp, sp, 24
 	ret
+/*
+ * Params:
+ *      x0: u32 (on press flags)
+ *      x1: mut struct TetrominoState*
+*/
+handle_space:
+        stp     lr, x19, [sp, -16]!
+
+		and     x19, x0, GPIO_SPACE
+        cbz     x19, handle_space__end
+
+		sub sp, x1, TETROMINO_STATE
+		b restart
+	
+handle_space__end:
+        ldp     lr, x19, [sp], 16
+        ret
 
 /*
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
- */
 handle_space:
         stp     lr, x19, [sp, -16]!
 
@@ -1540,6 +1558,7 @@ handle_space:
 handle_space__end:
         ldp     lr, x19, [sp], 16
         ret
+ */
 
 
 /*
