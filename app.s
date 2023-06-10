@@ -1154,8 +1154,10 @@ binary_to_decimal__next_digit:
         cbnz    x19, binary_to_decimal__next_digit      // loop only if new dividend is not 0
 
 
-        /* Now we push minus if original number was negative */
+        /* Now we push minus if original number was negative, but first we check if buffer has sufficient space */
         cbz     x22, binary_to_decimal__end
+        cmp     x21, x2                 // check if there is buffer remaining
+        b.ge    binary_to_decimal__end  // skip if buffer ended
         mov     w10, DIGIT_MINUS_INDEX  // w10 <- digit minus index
         strb    w10, [x1]               // store minus in buffer
         add     x21, x21, 1             // increment index
