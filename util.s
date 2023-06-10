@@ -2,6 +2,7 @@
 UTIL_S:
 
         .equ MOD_2_Q32_MASK,    (1 << 33) - 1
+        .equ ONE_HALF_Q32,      1 << 31
 
 /*
  * Params:
@@ -26,6 +27,46 @@ sine_wave__right_case:
 sine_wave__end:
         ldp     lr, x19, [sp], 16
         ret
+
+
+
+/*
+ * Params:
+ *      x0: i64 (Q32)   <- x (time)
+ *      x1: u64 (Q32)   <- amplitude
+ *      x2: u64 (Q32)   <- frequency
+ *      x3: u64 (Q32)   <- phase
+ * Returns:
+ *      x0: u64 (Q32)   <- sine_wave_advanced(x) in [-amplitude..amplitude]
+ * Comments:
+ *      If x1 == x2 == 1 and x3 == 0 then this function looks like sin(2pix)
+ */
+sine_wave_advanced:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x1         // x19 <- amplitude
+
+        asr     x0, x0, 16              // x0 <- time           (Q16)
+        asr     x2, x2, 15              // x2 <- 2 * frequency  (Q16)
+        mul     x0, x0, x2              // x0 <- time * 2*frequency               (Q32)
+        add     x0, x0, x3              // x0 <- (time * 2*frequency) + phase     (Q32)
+        mov     x9, ONE_HALF_Q32
+        add     x0, x0, x9              // add default phase (so that it starts at y = 0)
+        bl      sine_wave
+
+        mov     x9, ONE_HALF_Q32
+        sub     x0, x0, x9      // map x0 to [-0.5, 0.5]
+        lsl     x0, x0, 1       // map x0 to [-1.0, 1.0]
+
+        asr     x0, x0, 16      // Q16
+        asr     x19, x19, 16    // Q16
+        mul     x0, x0, x19     // map x0 to [-amplitude, amplitude]
+
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
 
 /*
  * Params:

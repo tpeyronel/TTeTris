@@ -1473,7 +1473,12 @@ draw_time:
 
         lsl     x0, x0, 32      // x0 <- time in milliseconds   (Q32)
         udiv    x0, x0, x9      // x0 <- time in seconds        (Q32)
-        bl      sine_wave
+        // orr     x0, xzr, 1 << 29
+        orr     x1, xzr, 1 << 32
+        orr     x2, xzr, 1 << 30
+        // orr     x3, xzr, 1 << 30
+        mov     x3, 0
+        bl      sine_wave_advanced
         mov     x9, 1000
         mul     x0, x0, x9      // x0 <- number between 0 and 1000 (Q32)
         asr     x0, x0, 32      // x0 <- number between 0 and 1000
