@@ -30,6 +30,8 @@
         .equ MS_PER_DROP,               400
         .equ US_PER_AUTO_DROP,          MS_PER_DROP * 1000
 
+        .equ DESTROY_PARTICLE_RADIUS,	10
+        .equ DESTROY_PARTICLE_COLOR,    0xFFFF0000
 
         .equ BACK_BUFFER_ADDRESS,       0x1000000
 
@@ -273,6 +275,11 @@ game_loop__keep_tetromino:
         mov     x0, sp
         mov     x1, x28
         bl      draw_board
+
+
+        mov     x0, sp
+        mov     x1, x28
+        bl      draw_destroy_particles
 
 
         add     x0, sp, PARTICLE_MANAGER
@@ -810,6 +817,127 @@ draw_board_end:
         add     sp, sp, 48
         ret
 
+
+
+/*
+ * Params:
+ *      x0: struct GameState*   <- game state
+ *	x1: in/out u32*         <- framebuffer
+ */
+draw_destroy_particles:
+        sub     sp, sp, 72
+        stur    lr, [sp]
+        stur    x19, [sp, 8]
+        stur    x20, [sp, 16]
+        stur    x21, [sp, 24]
+        stur    x22, [sp, 32]
+        stur    x23, [sp, 40]
+        stur    x24, [sp, 48]
+        stur    x25, [sp, 56]
+        stur    x26, [sp, 64]
+
+        add     x19, x0, (BOARD_STATE + BSTATE_DESTROYED_ROWS)
+        mov     x24, x0
+
+        add     x0, x0, LAST_DROP
+        ldur    x0, [x0]
+        mov     x20, x0
+
+        mov     x21, ( (SCREEN_WIDTH - BOARD_WIDTH * TETRIS_CELL_SIZE) / 2 )
+        sub     x21, x21, TETRIS_CELL_SIZE
+
+        mov     x22, ( (TETRIS_CELL_SIZE + SCREEN_HEIGH - BOARD_HEIGHT * TETRIS_CELL_SIZE) / 2 )
+
+        mov     x23, x1
+
+        mov     x2, 4
+
+draw_destroy_particles__loop:
+        ldurb   w3, [x19]
+
+        cmp     x3, 0xff
+        b.eq    draw_destroy_particles__end
+
+        sub     sp, sp, 8
+        stur    x2, [sp]
+
+        mov     x0, x20
+        bl      get_elapsed_time
+        lsl     x0, x0, 5
+        ldr     w2, =US_PER_AUTO_DROP
+        udiv    x4, x0, x2
+        mov     x5, 1
+        lsl     x5, x5, 5
+        sub     x5, x5, x4
+        mov     x0, DESTROY_PARTICLE_RADIUS
+        mul     x2, x5, x0
+        lsr     x2, x2, 5
+        mov     x10, x2
+        mov     x25, x2
+
+        /*
+        cmp x10, 0
+        b.le draw_destroy_particles__destroy
+        */
+
+
+        mov     x2, 50
+        mul     x4, x4, x2
+        lsr     x4, x4, 5
+        mov     x24, x4
+
+        mov     x26, TETRIS_CELL_SIZE
+        mul     x26, x26, x3
+
+        sub     x0, x21, x24
+
+        add     x1, x22, x26
+
+        mov     x2, x23
+        mov     x3, x25
+        ldr     x4, =DESTROY_PARTICLE_COLOR
+        bl      draw_circle_at
+
+        mov     x0, SCREEN_WIDTH
+        sub     x0, x0, x21
+        add     x0, x0, x24
+
+        add     x1, x22, x26
+
+        mov     x2, x23
+        mov     x3, x25
+        ldr     x4, =DESTROY_PARTICLE_COLOR
+        bl      draw_circle_at
+
+        ldur    x2, [sp]
+        add     sp, sp, 8
+
+        sub     x2, x2, 1
+        add     x19, x19, 1
+        cbnz    x2, draw_destroy_particles__loop
+        b       draw_destroy_particles__end
+
+draw_destroy_particles__destroy:
+        /*
+        mov x0, x24
+        add x0, x0, BOARD_STATE + BSTATE_DESTROYED_ROWS
+        movz x1, 0xff, lsl 00
+        sturb w1, [x0]
+        */
+
+draw_destroy_particles__end:
+
+        ldur    x26, [sp, 64]
+        ldur    x25, [sp, 56]
+        ldur    x24, [sp, 48]
+        ldur    x23, [sp, 40]
+        ldur    x22, [sp, 32]
+        ldur    x21, [sp, 24]
+        ldur    x20, [sp, 16]
+        ldur    x19, [sp, 8]
+        ldur    lr, [sp]
+        add     sp, sp, 72
+        ret
 
 
 
@@ -1610,11 +1738,6 @@ index_bg_color:
  *      x2: beginning of framebuffer
  *      x3: radius
  *      w4: color
- * Returns:
- *      x0: unmodified x coordinate
- *      x1: unmodified y coordinate
- *      x2: unmodified beginning of framebuffer
- *      w3: -
  */
 draw_circle_at:
         stp     lr, x19, [sp, -48]!
