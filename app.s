@@ -183,6 +183,7 @@ main:
 	mov     x9, GPIO_BASE
 	str     wzr, [x9, GPIO_GPFSEL0]
 
+restart:
         // Allocate and init struct GameState
         mov     x9, STRUCT_GAME_STATE_SIZE
         sub     sp, sp, x9
@@ -836,6 +837,8 @@ read_input:
         ldp     lr, x19, [sp], 32
         ret
 
+
+
 /*
  * Params:
  *      x0: const struct InputState*
@@ -867,6 +870,8 @@ process_input:
         ldp     lr, x19, [sp], 32
         ret
 
+
+
 /*
  * Params:
  *      x0: u32 (on press flags)
@@ -874,99 +879,192 @@ process_input:
  *	x2: in struct BoardState*
  */
 handle_w:
-        stp     lr, x19, [sp, -16]!
+        sub     sp, sp, 32
+        stur    lr, [sp]
+        stur    x19, [sp, 8]
+        stur    x20, [sp, 16]
+        stur    x21, [sp, 24]
 
-	and     x19, x0, GPIO_W
+        and     x19, x0, GPIO_W
         cbz     x19, handle_w__end
 
-        ldr     x19, [x1, TSTATE_POS_Y]
-        add     x19, x19, MOVEMENT_PER_STEP     // Move player up
-        str     x19, [x1, TSTATE_POS_Y]
+        mov     x20, x1
+
+        mov     x0, x1
+        mov     x1, x2
+
+        ldur    x19, [x20, TSTATE_ROT]
+        mov     x21, x19
+        add     x19, x19, 1
+        cmp     x19, 4
+        b.ne    handle_w__rot_ok
+        mov     x19, 0
+handle_w__rot_ok:
+        stur    x19, [x20, TSTATE_ROT]
+
+        bl      check_collision
+        cbz     x0, handle_w__end
+
+        stur    x21, [x20, TSTATE_ROT]
 
 handle_w__end:
-        ldp     lr, x19, [sp], 16
+        ldur    lr, [sp]
+        ldur    x19, [sp, 8]
+        ldur    x20, [sp, 16]
+        ldur    x21, [sp, 24]
+        add     sp, sp, 32
         ret
+
+
 
 /*
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
+ *	x2: in struct BoardState*
  */
 handle_s:
-        stp     lr, x19, [sp, -16]!
+        sub     sp, sp, 40
+        stur    lr, [sp]
+        stur    x19, [sp, 8]
+        stur    x20, [sp, 16]
+        stur    x21, [sp, 24]
+        stur    x22, [sp, 32]
 
-	and     x19, x0, GPIO_S
+        and     x19, x0, GPIO_S
         cbz     x19, handle_s__end
 
-        ldr     x19, [x1, TSTATE_POS_Y]
-        sub     x19, x19, MOVEMENT_PER_STEP     // Move player down
-        str     x19, [x1, TSTATE_POS_Y]
+        mov     x20, x1
+
+        mov     x0, x1
+        mov     x1, x2
+
+handle_s__loop:
+        ldur    x19, [x20, TSTATE_POS_Y]
+        sub     x19, x19, 1
+        stur    x19, [x20, TSTATE_POS_Y]
+
+        mov     x21, x0
+        mov     x22, x1
+        bl      check_collision
+        mov     x2, x0
+        mov     x0, x21
+        mov     x1, x22
+        cbz     x2, handle_s__loop
+
+        ldur    x19, [x20, TSTATE_POS_Y]
+        add     x19, x19, 1
+        stur    x19, [x20, TSTATE_POS_Y]
 
 handle_s__end:
-        ldp     lr, x19, [sp], 16
+        ldur    lr, [sp]
+        ldur    x19, [sp, 8]
+        ldur    x20, [sp, 16]
+        ldur    x21, [sp, 24]
+        ldur    x22, [sp, 32]
+        add     sp, sp, 40
         ret
+
+
 
 /*
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
+ *	x2: const struct BoardState*
  */
 handle_a:
-        stp     lr, x19, [sp, -16]!
+        sub     sp, sp, 24
+        stur    lr, [sp]
+        stur    x19, [sp, 8]
+        stur    x20, [sp, 16]
 
-	and     x19, x0, GPIO_A
+        and     x19, x0, GPIO_A
         cbz     x19, handle_a__end
 
-        ldr     x19, [x1, TSTATE_POS_X]
-        sub     x19, x19, MOVEMENT_PER_STEP     // Move player left
-        str     x19, [x1, TSTATE_POS_X]
+        mov     x20, x1
+
+        mov     x0, x1
+        mov     x1, x2
+
+        ldur    x19, [x20, TSTATE_POS_X]
+        sub     x19, x19, 1
+        stur    x19, [x20, TSTATE_POS_X]
+
+        bl      check_collision
+        cbz     x0, handle_a__end
+
+        ldur    x19, [x20, TSTATE_POS_X]
+        add     x19, x19, 1
+        stur    x19, [x20, TSTATE_POS_X]
 
 handle_a__end:
-        ldp     lr, x19, [sp], 16
+        ldur    lr, [sp]
+        ldur    x19, [sp, 8]
+        ldur    x20, [sp, 16]
+        add     sp, sp, 24
         ret
+
+
 
 /*
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
+ *	x2: const struct BoardState*
  */
 handle_d:
-        stp     lr, x19, [sp, -16]!
+        sub     sp, sp, 24
+        stur    lr, [sp]
+        stur    x19, [sp, 8]
+        stur    x20, [sp, 16]
 
-	and     x19, x0, GPIO_D
+        and     x19, x0, GPIO_D
         cbz     x19, handle_d__end
 
-        ldr     x19, [x1, TSTATE_POS_X]
-        add     x19, x19, MOVEMENT_PER_STEP     // Move player one position right
-        str     x19, [x1, TSTATE_POS_X]
+        mov     x20, x1
+
+        mov     x0, x1
+        mov     x1, x2
+
+        ldur    x19, [x20, TSTATE_POS_X]
+        add     x19, x19, 1
+        stur    x19, [x20, TSTATE_POS_X]
+
+        bl      check_collision
+        cbz     x0, handle_d__end
+
+        ldur    x19, [x20, TSTATE_POS_X]
+        sub     x19, x19, 1
+        stur    x19, [x20, TSTATE_POS_X]
 
 handle_d__end:
-        ldp     lr, x19, [sp], 16
+        ldur    lr, [sp]
+        ldur    x19, [sp, 8]
+        ldur    x20, [sp, 16]
+        add     sp, sp, 24
         ret
+
 
 
 /*
  * Params:
  *      x0: u32 (on press flags)
  *      x1: mut struct TetrominoState*
- */
+*/
 handle_space:
         stp     lr, x19, [sp, -16]!
 
-	and     x19, x0, GPIO_SPACE
+        and     x19, x0, GPIO_SPACE
         cbz     x19, handle_space__end
 
-        ldr     x19, [x1, TSTATE_ID]
-
-        add     x19, x19, #1
-        cmp     x19, 7
-        csel    x19, x19, xzr, lt         // Set x19 to zero if it's equal to 7
-
-        str     x19, [x1, TSTATE_ID]
+        sub     sp, x1, TETROMINO_STATE
+        b       restart
 
 handle_space__end:
         ldp     lr, x19, [sp], 16
         ret
+
 
 
 /*
@@ -1017,14 +1115,15 @@ clamp_player_coords__end_top:
  *      x0: struct GameState*
  */
 tetromino_fall:
-        sub sp, sp, 56
+        sub sp, sp, 64
         stur lr, [sp]
         stur x19, [sp, 8]
         stur x20, [sp, 16]
         stur x21, [sp, 24]
         stur x22, [sp, 32]
-        stur x24, [sp, 40]
-        stur x25, [sp, 48]
+        stur x23, [sp, 40]
+        stur x24, [sp, 48]
+        stur x25, [sp, 56]
 
         mov     x19, x0         // x19 <- struct GameState*
 
@@ -1084,14 +1183,15 @@ tetromino_fall__end:
 
 tetromino_fall__fullend:
 
-        ldur    x25, [sp, 48]
-        ldur    x24, [sp, 40]
+        ldur    x25, [sp, 56]
+        ldur    x24, [sp, 48]
+        ldur    x23, [sp, 40]
         ldur    x22, [sp, 32]
         ldur    x21, [sp, 24]
         ldur    x20, [sp, 16]
         ldur    x19, [sp, 8]
         ldur    lr, [sp]
-        add     sp, sp, 56
+        add     sp, sp, 64
         ret
 
 
@@ -1725,7 +1825,7 @@ check_collision__goodending:
 check_collision__badending:
         mov     x0, 1
 check_collision__end_end:
-        stp     x24, x25, [sp, 48]
+        ldp     x24, x25, [sp, 48]
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 64
