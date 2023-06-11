@@ -14,7 +14,7 @@
         .equ SQUARE_SIZE,               40
 
         .equ BOARD_WIDTH,               10
-        .equ BOARD_HEIGHT,              22
+        .equ BOARD_HEIGHT,              20
         .equ BOARD_SIZE,                BOARD_WIDTH * BOARD_HEIGHT
         .equ BOARD_SIZE_IN_BYTES,       BOARD_SIZE * 1
 
@@ -224,6 +224,13 @@ main:
 
 
 
+
+
+/*
+ * ************* *
+ * * GAME LOOP * *
+ * ************* *
+ */
 game_loop:
 
         add     x0, sp, INPUT_STATE
@@ -260,6 +267,12 @@ game_loop__keep_tetromino:
 
         mov     x0, x28
         bl      draw_canvas
+
+
+        mov     x0, sp
+        mov     x1, x28
+        bl      draw_board
+
 
         add     x0, sp, PARTICLE_MANAGER
         mov     x1, x28
@@ -640,6 +653,160 @@ draw_canvas__next_pixel:
         b.gt    draw_canvas__next_pixel // Loop if pixels remain
 
         ldp     lr, x19, [sp], 16
+        ret
+
+
+
+
+/*
+ * Params:
+ *      mut x0: struct GameState*
+ *      mut x1: framebuffer address
+ */
+draw_board:
+        sub     sp, sp, 48
+        stur    lr, [sp]
+        stur    x19, [sp, 8]
+        stur    x20, [sp, 16]
+        stur    x21, [sp, 24]
+        stur    x22, [sp, 32]
+        stur    x23, [sp, 40]
+
+        mov     x23, x0
+
+        add     x9, x0, (BOARD_STATE + BSTATE_BOARD)
+
+        mov     x11, x1
+
+        add     x0, x0, TETROMINO_STATE
+        bl      get_tetromino
+        mov     x19, x0			// x19 -> tetromino matrix
+        mov     x20, x1			// x20 -> tetromino x pos
+        mov     x21, x2			// x21 -> tetromino y pos
+        mov     x22, x3			// x22 -> tetromino color
+
+
+
+        mov    x14, 0             // row iterator
+draw_board_outer:
+        mov     x15, 0             // column iterator
+draw_board_inner:
+
+        cmp     x15, x20
+        b.lt    draw_board_not_tetromino
+
+        add     x12, x20, (TETROMINO_BOARD_WIDTH-1)
+        cmp     x15, x12
+        b.gt    draw_board_not_tetromino
+
+        cmp     x14, x21
+        b.lt    draw_board_not_tetromino
+
+        add     x12, x21, (TETROMINO_BOARD_WIDTH-1)
+        cmp     x14, x12
+        b.gt    draw_board_not_tetromino
+        // if I got here, then I'm currently on a square of the tetromino
+        sub     x0, x15, x20
+        sub     x1, x14, x21
+
+        mov     x4, TETROMINO_BOARD_WIDTH
+        mul     x1, x1, x4
+
+        add     x0, x0, x1
+
+        add     x0, x0, x19
+
+        ldurb   w1, [x0]
+
+        cbz     x1, draw_board_not_tetromino		// draw whatever there is in the board
+        ldur    x12, [x23, TETROMINO_STATE + TSTATE_ID]
+        b       draw_board__draw_tetris_cell
+
+
+draw_board_not_tetromino:
+        ldurb   w12, [x9]
+        mov     x4, 0
+        cbz     x12, draw_board_no_square
+
+        sub     x12, x12, TETROMINO_ID_BIAS
+
+        /*
+        mov x0, x12
+    bl get_tetromino_color
+        mov x4, x0
+        */
+
+draw_board__draw_tetris_cell:
+        mov     x0, x15
+        mov     x1, x14
+        mov     x2, TETRIS_CELL_SIZE
+        mul     x0, x0, x2
+        add     x0, x0, ( (SCREEN_WIDTH - BOARD_WIDTH * TETRIS_CELL_SIZE) / 2 )
+        mul     x1, x1, x2
+        add     x1, x1, ( (SCREEN_HEIGH - BOARD_HEIGHT * TETRIS_CELL_SIZE) / 2 )
+
+        mov     x2, x12
+        mov     x3, STRUCT_TETROMINO_SIZE
+        mul     x2, x2, x3
+        ldr     x3, =TETROMINOS
+        add     x2, x2, x3
+
+        mov     x3, x11
+
+        sub     sp, sp, 48
+        stur    x11, [sp]
+        stur    x12, [sp, 8]
+        stur    x13, [sp, 16]
+        stur    x14, [sp, 24]
+        stur    x15, [sp, 32]
+        stur    x9, [sp, 40]
+
+        bl      draw_tetris_cell
+
+        ldur    x11, [sp]
+        ldur    x12, [sp, 8]
+        ldur    x13, [sp, 16]
+        ldur    x14, [sp, 24]
+        ldur    x15, [sp, 32]
+        ldur    x9, [sp, 40]
+        add     sp, sp, 48
+
+        b       draw_board__finished_tetris_cell
+
+draw_board_no_square:    // draw bakcground
+        mov     x0, x15
+        mov     x1, x14
+        mov     x2, TETRIS_CELL_SIZE
+        mul     x0, x0, x2
+        add     x0, x0, ( (SCREEN_WIDTH - BOARD_WIDTH * TETRIS_CELL_SIZE) / 2 )
+        mul     x1, x1, x2
+        add     x1, x1, ( (SCREEN_HEIGH - BOARD_HEIGHT * TETRIS_CELL_SIZE) / 2 )
+        mov     x3, x11
+
+        bl      draw_filled_square
+
+draw_board__finished_tetris_cell:
+        add     x15, x15, 1
+        add     x9, x9, 1
+        cmp     x15, BOARD_WIDTH
+        b.lt    draw_board_inner
+
+        add     x14, x14, 1
+        cmp     x14, BOARD_HEIGHT
+        b.eq    draw_board_end
+
+        b       draw_board_outer
+
+draw_board_end:
+
+
+        ldur    x23, [sp, 40]
+        ldur    x22, [sp, 32]
+        ldur    x21, [sp, 24]
+        ldur    x20, [sp, 16]
+        ldur    x19, [sp, 8]
+        ldur    lr, [sp]
+        add     sp, sp, 48
         ret
 
 
