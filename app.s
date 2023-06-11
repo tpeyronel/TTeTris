@@ -263,14 +263,18 @@ game_loop__keep_tetromino:
 
         mov     x0, ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * ((BOARD_WIDTH / 2) + 1)))
         mov     x1, ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * ((BOARD_HEIGHT / 2) + 1)))
+        mov     x19, x1
         add     x2, sp, BOARD_STATE
         add     x3, sp, TETROMINO_STATE
         mov     x4, x28
         bl      draw_board
 
 
-        add     x0, sp, GAME_STATS
-        mov     x1, x28
+        mov     x0, (SCREEN_WIDTH - 1)
+        sub     x0, x0, x19
+        mov     x1, x19
+        add     x2, sp, GAME_STATS
+        mov     x3, x28
         bl      draw_stats
 
 
@@ -779,39 +783,38 @@ is_tetromino_cell_air:
 
 /*
  * Params:
- *      x0: in struct GameStats*        <- game stats
- *      x1: out u32*                    <- framebuffer
+ *      x0: u64                         <- bottom right x (game coordinates)
+ *      x1: u64                         <- bottom right y (game coordinates)
+ *      x2: in struct GameStats*        <- game stats
+ *      x3: out u32*                    <- framebuffer
  */
 draw_stats:
         stp     lr, x19, [sp, -16]!
         sub     sp, sp, STRUCT_DNI_SIZE
 
-        mov     x9, SCREEN_WIDTH - 16
-        str     x9, [sp, DNI_POS_X]
+        str     x0, [sp, DNI_POS_X]
+        str     x1, [sp, DNI_POS_Y]
 
-        mov     x9, 16
-        str     x9, [sp, DNI_POS_Y]
-
-        ldr     x9, [x0, GS_COMPLETED_ROWS]
+        ldr     x9, [x2, GS_COMPLETED_ROWS]
         str     x9, [sp, DNI_VALUE]
 
         mov     x9, 5
         str     x9, [sp, DNI_MAX_DIGITS]
 
-        mov     x9, 32
+        mov     x9, 48
         str     x9, [sp, DNI_DIGIT_WIDTH]
 
-        mov     x9, 6
+        mov     x9, 12
         str     x9, [sp, DNI_DIGIT_THICKNESS]
 
-        mov     x9, 4
+        mov     x9, 12
         str     x9, [sp, DNI_DIGIT_SPACING]
 
         ldr     w9, =0xFFFFFFFF
         str     w9, [sp, DNI_COLOR]
 
         mov     x0, sp
-        mov     x1, x1
+        mov     x1, x3
         bl      draw_number
 
         add     sp, sp, STRUCT_DNI_SIZE
