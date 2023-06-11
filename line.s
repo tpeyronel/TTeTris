@@ -22,7 +22,7 @@ LINE_S:
  *      x0: u64         <- x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
  *      x1: u64         <- y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      x2: u64         <- length > 0
- *      w3: u32         <- color
+ *      w3: u32         <- argb color
  *      x4: out u32*    <- beginning of framebuffer
  * Comments:
  *      Draws a line from (x0, x1) to (x0 + x2, x1)
@@ -45,7 +45,7 @@ draw_horizontal_line:
  *      x0: u64         <- x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
  *      x1: u64         <- y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      x2: u64         <- length > 0
- *      w3: u32         <- color
+ *      w3: u32         <- argb color
  *      x4: out u32*    <- beginning of framebuffer
  * Comments:
  *      Draws a line from (x0, x1) to (x0, x1 + x2)
@@ -71,32 +71,49 @@ draw_vertical_line:
  *      x1: u64         <- y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      x2: u64         <- offset in bytes
  *      x3: u64         <- steps > 0
- *      w4: u32         <- color
+ *      w4: u32         <- argb color
  *      x5: out u32*    <- beginning of framebuffer
  * Comments:
  *      Draws a line from (x0, x1) to (x0 + x2, x1)
  */
 draw_line_by_offset:
-        stp     lr, x19, [sp, -16]!
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+
+        mov     x20, x0         // x20 <- x coordinate
+        mov     x21, x1         // x21 <- y coordinate
+        mov     x22, x2         // x22 <- offset in bytes
+        mov     x23, x3         // x23 <- steps > 0
+        mov     w24, w4         // x24 <- argb color
+        mov     x25, x5         // x25 <- beginning of framebuffer
+
 
         // Convert game y coordinates to screen y coordinates
         mov     x9, (SCREEN_HEIGH - 1)
-        sub     x1, x9, x1
+        sub     x21, x9, x21
 
         mov     x9, SCREEN_WIDTH              // x9 = screen width
-        mul     x9, x9, x1                    // x9 = initial vertical offset
-        add     x9, x9, x0                    // x9 = initial vertical offset + initial horizontal offset
+        mul     x9, x9, x21                   // x9 = initial vertical offset
+        add     x9, x9, x20                   // x9 = initial vertical offset + initial horizontal offset
         lsl     x9, x9, BYTES_PER_PIXEL_SHIFT // x9 = total offset
-        add     x5, x5, x9                    // x5 = &framebuffer['first pixel of line']
+        add     x25, x25, x9                  // x25 = &framebuffer['first pixel of line']
 
 
 draw_line_by_offset__next_pixel:
-        str     w4, [x5]                                // Color pixel
-        add     x5, x5, x2                              // Advance to next pixel by offset parameter
-        subs    x3, x3, 1                               // Decrement remaining steps
+        mov     w0, w24
+        mov     x1, x25
+        bl      draw_argb_pixel                         // Color pixel
+
+        add     x25, x25, x22                           // Advance to next pixel by offset parameter
+        subs    x23, x23, 1                             // Decrement remaining steps
         b.gt    draw_line_by_offset__next_pixel         // Loop only if line has not been completed
 
-        ldp     lr, x19, [sp], 16
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
         ret
 
 

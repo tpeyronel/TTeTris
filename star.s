@@ -1,15 +1,16 @@
 .ifndef STAR_S
 STAR_S:
 
-.include "./constants.s"
-.include "./line.s"
+        .include "./constants.s"
+        .include "./line.s"
+        .include "./pixel.s"
 
 /*
  * Params:
  *      x0: u64         <- x position
  *      x1: u64         <- y position
  *      x2: u64         <- size => final size = isOdd(size) ? size : size - 1
- *      w3: u32         <- color
+ *      w3: u32         <- argb color
  *      x4: out u32*    <- framebuffer
  */
 draw_four_point_star:
@@ -18,6 +19,8 @@ draw_four_point_star:
         stp     x22, x23, [sp, 32]
         stp     x24, x25, [sp, 48]
         stp     x26, x27, [sp, 64]
+
+        stp     x0, x1, [sp, -16]!      // Save x0 and x1 in stack for later use
 
         /* Normalize size (subtract 1 if size is even) */
         and     x9, x2, 0b1
@@ -78,10 +81,18 @@ draw_four_point_star__next_col:
 
         /* Draw in all 4 quadrants */
         /* TODO: check bounds for each str */
-        str     w3, [x24]
-        str     w3, [x25]
-        str     w3, [x26]
-        str     w3, [x27]
+        mov     w0, w3
+        mov     x1, x24
+        bl      draw_argb_pixel
+        mov     w0, w3
+        mov     x1, x25
+        bl      draw_argb_pixel
+        mov     w0, w3
+        mov     x1, x26
+        bl      draw_argb_pixel
+        mov     w0, w3
+        mov     x1, x27
+        bl      draw_argb_pixel
 
 draw_four_point_star__inside_circle:
         mov     x9, SCREEN_WIDTH
@@ -122,6 +133,8 @@ draw_four_point_star__end_of_row:
 
 draw_four_point_star__end_of_quadrant:
 
+        ldp     x0, x1, [sp], 16        // Restore x0 and x1 from stack
+
         /* Save arguments */
         mov     x20, x0         // x20 = center x coordinate
         mov     x9, SCREEN_HEIGH - 1
@@ -140,10 +153,18 @@ draw_four_point_star__end_of_quadrant:
         bl      draw_horizontal_line
 
 
-        /* Draw center vertical line */
+        /* Draw center bottom vertical line */
         mov     x0, x20
         sub     x1, x21, x19
-        mov     x2, x22
+        lsr     x2, x22, 1
+        mov     w3, w23
+        mov     x4, x24
+        bl      draw_vertical_line
+
+        /* Draw center top vertical line */
+        mov     x0, x20
+        add     x1, x21, 1
+        lsr     x2, x22, 1
         mov     w3, w23
         mov     x4, x24
         bl      draw_vertical_line

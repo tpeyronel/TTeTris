@@ -6,7 +6,7 @@ PIXEL_S:
 
 /*
  * Params:
- *      w0: u32 (ARGB)          <- color
+ *      w0: u32 (ARGB)          <- argb color
  *      x1: in/out u32*         <- pointer in which to write pixel
  */
 draw_argb_pixel:
