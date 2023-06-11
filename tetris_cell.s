@@ -18,18 +18,53 @@ TETRIS_CELL_S:
  *      x3: out u32*            <- framebuffer
  */
 draw_tetris_cell:
-        stp     lr, x19, [sp, -48]!
+        stp     lr, x19, [sp, -16]!
+
+        mov     x9, x2          // x9 <- tetromino
+
+        mov     x5, x3          // x5 <- framebuffer
+        mov     x0, x0
+        mov     x1, x1
+        ldr     w2, [x9, TETROMINO_DIFFUSE_COLOR]
+        ldr     w3, [x9, TETROMINO_SPECULAR_COLOR]
+        ldr     w4, [x9, TETROMINO_AMBIENT_COLOR]
+        bl      draw_tetris_cell_by_colors
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                 <- bottom left x position (game coordinates)
+ *      x1: u64                 <- bottom left y position (game coordinates)
+ *      w2: u32                 <- diffuse color
+ *      w3: u32                 <- specular color
+ *      w4: u32                 <- ambient color
+ *      x5: out u32*            <- framebuffer
+ */
+draw_tetris_cell_by_colors:
+        stp     lr, x19, [sp, -64]!
         stp     x20, x21, [sp, 16]
         stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
 
         /* Save arguments */
-        mov     x20, x0
-        mov     x21, x1
-        mov     x22, x2
-        mov     x23, x3
+        mov     x20, x0         // x20 <- bottom left x
+        mov     x21, x1         // x21 <- bottom left y
+        mov     w22, w2         // w22 <- diffuse color
+        mov     w23, w3         // w23 <- specular color
+        mov     w24, w4         // w24 <- ambient color
+        mov     x25, x5         // x25 <- framebuffer
 
 
         /* Draw border trapezoids */
+        mov     x0, x20
+        mov     x1, x21
+        mov     w2, w23
+        mov     w3, w24
+        mov     x4, x25
         bl      draw_tetris_cell_trapezoids
 
         /* Draw inner rectangle */
@@ -42,9 +77,8 @@ draw_tetris_cell:
         add     x3, x21, TETRIS_CELL_SIZE - 1
         sub     x3, x3, TETRIS_CELL_BORDER_SIZE         // x3 = inner rectangle top right y
 
-        mov     x4, x23                                 // x4 = framebuffer
-        ldr     w5, [x22, TETROMINO_DIFFUSE_COLOR]      // w5 = diffuse color
-
+        mov     x4, x25                                 // x4 = framebuffer
+        mov     w5, w22                                 // w5 = diffuse color
         bl      draw_filled_rectangle
 
         /* Draw bottom left diagonal line */
@@ -52,8 +86,8 @@ draw_tetris_cell:
         mov     x1, x21
         add     x2, x0, TETRIS_CELL_BORDER_SIZE - 1
         add     x3, x1, TETRIS_CELL_BORDER_SIZE - 1
-        mov     x4, x23                                 // x4 = framebuffer
-        ldr     w5, [x22, TETROMINO_DIFFUSE_COLOR]      // w5 = diffuse color
+        mov     x4, x25                                 // x4 = framebuffer
+        mov     w5, w22                                 // w5 = diffuse color
         bl      draw_line
 
         /* Draw top right diagonal line */
@@ -61,22 +95,25 @@ draw_tetris_cell:
         add     x1, x21, TETRIS_CELL_SIZE - 1
         sub     x2, x0, TETRIS_CELL_BORDER_SIZE - 1
         sub     x3, x1, TETRIS_CELL_BORDER_SIZE - 1
-        mov     x4, x23                                 // x4 = framebuffer
-        ldr     w5, [x22, TETROMINO_DIFFUSE_COLOR]      // w5 = diffuse color
+        mov     x4, x25                                 // x4 = framebuffer
+        mov     w5, w22                                 // w5 = diffuse color
         bl      draw_line
 
+        ldp     x24, x25, [sp, 48]
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 48
+        ldp     lr, x19, [sp], 64
         ret
+
 
 
 /*
  * Params:
  *      x0: u64                 <- bottom left x position (game coordinates)
  *      x1: u64                 <- bottom left y position (game coordinates)
- *      x2: in Tetromino*       <- tetromino
- *      x3: out u32*            <- framebuffer
+ *      w2: u32                 <- specular color
+ *      w3: u32                 <- ambient color
+ *      x4: out u32*            <- framebuffer
  */
 draw_tetris_cell_trapezoids:
         stp     lr, x19, [sp, -80]!
@@ -84,6 +121,9 @@ draw_tetris_cell_trapezoids:
         stp     x22, x23, [sp, 32]
         stp     x24, x25, [sp, 48]
         stp     x26, x27, [sp, 64]
+
+        mov     w22, w2         // const w22 <- specular color
+        mov     w23, w3         // const w23 <- specular color
 
 
         /* Convert coordinates */
@@ -99,7 +139,7 @@ draw_tetris_cell_trapezoids:
         add     x24, x24, x0                    // x24 = (SCREEN_WIDTH * y) + x = vertical + horizontal offset
         lsl     x24, x24, BYTES_PER_PIXEL_SHIFT // x24 = total offset in bytes
 
-        add     x24, x3, x24                    // x24 = top left of square
+        add     x24, x4, x24                    // x24 = top left of square
 
         mov     x9, TETRIS_CELL_SIZE - 1        // x9 = size - 1 = space between corners
         mov     x10, SCREEN_WIDTH
@@ -119,10 +159,6 @@ draw_tetris_cell_trapezoids:
         * x26 = left trapezoid pointer
         * x27 = right trapezoid pointer
         */
-
-        ldr     w22, [x2, TETROMINO_SPECULAR_COLOR]     // const w22 = specular color
-        ldr     w23, [x2, TETROMINO_AMBIENT_COLOR]      // const w23 = ambient color
-
 
         mov     x20, 0                          // x iterator
         mov     x21, 0                          // y iterator
