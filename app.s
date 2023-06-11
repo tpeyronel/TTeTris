@@ -11,8 +11,6 @@
 
         .equ MOVEMENT_PER_STEP,         16
 
-        .equ SQUARE_SIZE,               40
-
         .equ BOARD_WIDTH,               10
         .equ BOARD_HEIGHT,              20
         .equ BOARD_SIZE,                BOARD_WIDTH * BOARD_HEIGHT
@@ -216,19 +214,6 @@ restart:
 
 
 
-
-        ldr     w23, BG_COLORS          // w23 <- bg color | default BG_COLORS[0]
-        ldr     w24, PLAYER_COLOR       // w24 <- player color | default PLAYER_COLOR
-
-        mov     x20, 0                  // x20 <- square x coordinate
-        mov     x21, 0                  // x21 <- square y coordinate
-        bl      get_time
-        mov     w22, w0                 // w22 <- square's last movement
-
-
-
-
-
 /*
  * ************* *
  * * GAME LOOP * *
@@ -261,14 +246,13 @@ game_loop:
 game_loop__keep_tetromino:
 
 
-
-
-        ldr     x0, [sp, TETROMINO_STATE + TSTATE_ID]
-        bl      index_bg_color
-        mov     w23, w0
-
         mov     x0, x28
         bl      draw_canvas
+
+
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, x28
+        bl      particle_manager_render
 
 
         mov     x0, sp
@@ -286,211 +270,12 @@ game_loop__keep_tetromino:
         bl      draw_destroy_particles
 
 
-        add     x0, sp, PARTICLE_MANAGER
-        mov     x1, x28
-        bl      particle_manager_render
-
-        // mov     x0, 16
-        // mov     x1, 16
-        // mov     x2, 16
-        // mov     w3, w24
-        // mov     x4, x28
-        // bl      draw_horizontal_line
-
-        // mov     x0, 32
-        // mov     x1, 32
-        // mov     x2, 16
-        // mov     w3, w24
-        // mov     x4, x28
-        // bl      draw_vertical_line
-
-
-        mov     x0, 638
-        mov     x1, 1
-        mov     w2, w24
-        mov     x3, x28
-        bl      draw_time
-
-//         mov     x6, 64
-//         mov     w7, 0
-//
-// next_digit:
-//         mov     x0, x6
-//         mov     x1, 64
-//         mov     x2, 28
-//         mov     w3, w7
-//         mov     w4, w24
-//         mov     x5, x28
-//         bl      draw_decimal_digit
-//         add     x6, x6, 40
-//         add     w7, w7, 1
-//         cmp     w7, 10
-//         b.lt    next_digit
-
-
-
-        // mov     x0, 80
-        // mov     x1, 100
-        // mov     x2, 400
-        // mov     x3, 300
-        // mov     x4, x28
-        // mov     w5, w24
-        // bl      draw_filled_rectangle
-
-
-        // mov     x0, 400
-        // mov     x1, 350
-        // mov     x2, 100
-        // mov     x3, x28
-        // mov     w4, w24
-        // bl      draw_filled_square
-
-
-        mov     x0, x20
-        mov     x1, x21
-        mov     w2, w22
-        mov     x3, SQUARE_SIZE
-        bl      advance_square_maybe
-        mov     x20, x0
-        mov     x21, x1
-        mov     w22, w2
-
-
-        mov     x0, x20
-        mov     x1, x21
-        mov     x2, SQUARE_SIZE
-        mov     x3, x28
-        mov     w4, w24
-        bl      draw_filled_square
-
-
-        // mov     x0, (SCREEN_WIDTH / 2)
-        // mov     x1, (SCREEN_HEIGH / 2)
-        // ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
-        // ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
-        // mov     x4, x28
-        // mov     w5, 0xFF0000
-        // bl      draw_line
-
-        // mov     x0, (SCREEN_WIDTH / 2)
-        // mov     x1, (SCREEN_HEIGH / 2)
-        // ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
-        // ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
-        // ldr     w4, =0x7F00FF00
-        // mov     x5, x28
-        // bl      draw_line_fixedp
-
-        // mov     x0, (SCREEN_WIDTH / 2)
-        // mov     x1, (SCREEN_HEIGH / 2)
-        // ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
-        // ldr     x3, [sp, TETROMINO_STATE + TSTATE_POS_Y]
-        // ldr     w4, =0x7F0000FF
-        // mov     x5, x28
-        // bl      draw_line_with_iter
-
-
-
-
-
-
-
-        mov     x0, 256
-        mov     x1, 128
-        mov     x2, 8
-        mov     x3, 64
-        mov     x4, 400
-        mov     x5, 8
-        ldr     w6, =0x7F0000FF
-        mov     x7, x28
-        bl      draw_triangle
-
-
-        mov     x0, 256
-        mov     x1, 256
-        mov     x2, 400
-        mov     x3, 8
-        mov     x4, 480
-        mov     x5, 8
-        ldr     w6, =0x7F00FF00
-        mov     x7, x28
-        bl      draw_triangle
-
-
-
-
-
-
-        // mov     x0, 400
-        // mov     x1, 320
-        // ldr     x2, [sp, TETROMINO_STATE + TSTATE_POS_X]
-        // // mov     x2, 81
-        // ldr     w3, PLAYER_COLOR
-        // mov     x4, x28
-        // bl      draw_four_point_star
-
-
-        // ldr     x0, [sp, (TETROMINO_STATE + TSTATE_POS_X)]
-        // ldr     x1, [sp, (TETROMINO_STATE + TSTATE_POS_Y)]
-        // mov     x2, x28
-        // mov     x3, 100
-        // ldr     w4, =0x7F00FF00
-        // bl      draw_circle_at
-
-
-        mov     x0, 100
-        mov     x1, 100
-        ldr     x2, =TETROMINOS
-        mov     x3, x28
-        bl      draw_tetris_cell
-
-        mov     x0, 100 + TETRIS_CELL_SIZE
-        mov     x1, 100
-        ldr     x2, =TETROMINOS
-        add     x2, x2, STRUCT_TETROMINO_SIZE
-        mov     x3, x28
-        bl      draw_tetris_cell
-
-        mov     x0, 100 + 2 * TETRIS_CELL_SIZE
-        mov     x1, 100
-        ldr     x2, =TETROMINOS
-        add     x2, x2, 2 * STRUCT_TETROMINO_SIZE
-        mov     x3, x28
-        bl      draw_tetris_cell
-
-        mov     x0, 100 + 3 * TETRIS_CELL_SIZE
-        mov     x1, 100
-        ldr     x2, =TETROMINOS
-        add     x2, x2, 3 * STRUCT_TETROMINO_SIZE
-        mov     x3, x28
-        bl      draw_tetris_cell
-
-        mov     x0, 100 + 4 * TETRIS_CELL_SIZE
-        mov     x1, 100
-        ldr     x2, =TETROMINOS
-        add     x2, x2, 4 * STRUCT_TETROMINO_SIZE
-        mov     x3, x28
-        bl      draw_tetris_cell
-
-        mov     x0, 100 + 5 * TETRIS_CELL_SIZE
-        mov     x1, 100
-        ldr     x2, =TETROMINOS
-        add     x2, x2, 5 * STRUCT_TETROMINO_SIZE
-        mov     x3, x28
-        bl      draw_tetris_cell
-
-        mov     x0, 100 + 6 * TETRIS_CELL_SIZE
-        mov     x1, 100
-        ldr     x2, =TETROMINOS
-        add     x2, x2, 6 * STRUCT_TETROMINO_SIZE
-        mov     x3, x28
-        bl      draw_tetris_cell
-
-
         /* Copy back buffer to real framebuffer */
         mov     x0, x28
         mov     x9, STRUCT_GAME_STATE_SIZE
         ldr     x1, [sp, x9]                    // restore original framebuffer address from stack
         bl      copy_framebuffer
+
 
 game_loop__sleep:
         ldr     w0, [sp, LAST_TICK]
@@ -498,11 +283,15 @@ game_loop__sleep:
         mov     w2, US_PER_TICK
         cmp     w0, w2
         b.lt    game_loop__sleep
+
+
         ldr     w0, [sp, LAST_TICK]
         add     w0, w0, w2
         str     w0, [sp, LAST_TICK]
-
         b game_loop
+
+
+
 
 game_over:
         b       game_over
@@ -1244,49 +1033,6 @@ handle_space__end:
 
 /*
  * Params:
- *      x0: in/out struct TetrominoState*
- */
-clamp_player_coords:
-        /* Clamp x coordinate */
-        ldr     x9, [x0, TSTATE_POS_X]
-
-        cmp     x9, 0
-        b.ge    clamp_player_coords__end_left
-        mov     x9, 0
-clamp_player_coords__end_left:
-
-        cmp     x9, (SCREEN_WIDTH - 1)
-        b.le    clamp_player_coords__end_right
-        mov     x9, (SCREEN_WIDTH - 1)
-clamp_player_coords__end_right:
-
-        str     x9, [x0, TSTATE_POS_X]
-
-
-        /* Clamp y coordinate */
-        ldr     x9, [x0, TSTATE_POS_Y]
-
-        cmp     x9, 0
-        b.ge    clamp_player_coords__end_bottom
-        mov     x9, 0
-clamp_player_coords__end_bottom:
-
-        cmp     x9, (SCREEN_HEIGH - 1)
-        b.le    clamp_player_coords__end_top
-        mov     x9, (SCREEN_HEIGH - 1)
-clamp_player_coords__end_top:
-
-        str     x9, [x0, TSTATE_POS_Y]
-
-        ret
-
-
-
-
-
-
-/*
- * Params:
  *      x0: struct GameState*   <- game state
  */
 tetromino_fall:
@@ -1443,6 +1189,8 @@ try_drop_tetromino__end:
         ldur x19, [sp, 16]
         add sp, sp, 24
         br lr
+
+
 
 // Tries to place tetromino in its current position. Does it if possible, GAME OVER if not.
 // INTENDED USE: COLLISION CHECK POSITIVE & PLACE TETROMINO NEGATIVE => GAME OVER
@@ -1653,6 +1401,8 @@ get_tetromino_color:
         ldur    w2, [x2, TETROMINO_AMBIENT_COLOR]
         ret
 
+
+
 /*
  * Params:
  *      x0: in struct TetrominoState*
@@ -1684,7 +1434,6 @@ get_tetromino:
         ldur    w3, [x5, TETROMINO_SPECULAR_COLOR]
 
         ret
-
 
 
 
@@ -1751,27 +1500,9 @@ keepgoing:
 
         ldur    lr, [sp]
         add     sp, sp, 8
-
         ret
 
 
-
-/*
- * Params:
- *      x0: background color index
- * Returns:
- *      w0: background color
- */
-index_bg_color:
-        stp     lr, x19, [sp, -16]!
-
-        lsl     x0, x0, 2       // x0 = i * 4
-        ldr     x19, =BG_COLORS // x19 = &BG_COLORS[0]
-        add     x0, x19, x0     // x0 = &BG_COLORS[0] + (i * 4) = &BG_COLORS[i]
-        ldr     w0, [x0]        // w0 = BG_COLORS[i]
-
-        ldp     lr, x19, [sp], 16
-        ret
 
 /*
  * Params:
@@ -1833,67 +1564,6 @@ skip_circle_pixel:
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 48
-        ret
-
-
-
-
-
-/*
- * Params:
- *      x0: square x coordinate
- *      x1: square y coordinate
- *      w2: previous step
- *      x3: square size
- * Returns:
- *      x0: new square x coordinate
- *      x1: new square y coordinate
- *      w2: previous or new step
- */
-advance_square_maybe:
-        stp     lr, x19, [sp, -32]!
-        stp     x20, x21, [sp, 16]
-
-        mov     x20, x0                 // x20 = x coordinate
-        mov     x21, x1                 // x21 = y coordinate
-        mov     w19, w2                 // w19 = previous step
-
-        mov     w0, w19
-        bl      get_elapsed_time        // Sets w0, w1
-
-        ldr     w2, =US_PER_STEP
-        cmp     w0, w2                         // Check if we should move square
-        b.lt    advance_square_maybe__end
-
-        // Enough time has passed since last step
-        add     w19, w19, w2                    // Advance last step by time per step
-        add     x20, x20, x3                    // Advance square position by its size
-
-        ldr     x0, =SCREEN_WIDTH
-        sub     x0, x0, x3
-        cmp     x20, x0                         // Check if square is horizontally out of bounds
-        b.le    advance_square_maybe__end
-
-        // Square is at end of row
-        mov     x20, 0                          // Set square at beginning of row
-        add     x21, x21, x3                    // Move square one row up
-
-
-        ldr     x0, =SCREEN_HEIGH
-        sub     x0, x0, x3
-        cmp     x21, x0                         // Check if square is vertically out of bounds
-        b.le    advance_square_maybe__end
-
-        // Square is vertically out of bounds
-        mov     x21, 0                          // Set square at bottom row
-
-advance_square_maybe__end:
-        mov     x0, x20
-        mov     x1, x21
-        mov     w2, w19
-
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 32
         ret
 
 
