@@ -255,21 +255,13 @@ game_loop__keep_tetromino:
         bl      particle_manager_render
 
 
-        // mov     x0, sp
-        // mov     x1, x28
-        // bl      draw_board
-
-        mov     x0, ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * (BOARD_WIDTH / 2)))
-        mov     x1, ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * (BOARD_HEIGHT / 2)))
+        mov     x0, ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * ((BOARD_WIDTH / 2) + 1)))
+        mov     x1, ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * ((BOARD_HEIGHT / 2) + 1)))
         add     x2, sp, BOARD_STATE
         add     x3, sp, TETROMINO_STATE
         mov     x4, x28
-        bl      draw_board_inner
+        bl      draw_board
 
-        mov     x0, ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * ((BOARD_WIDTH / 2) + 1)))
-        mov     x1, ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * ((BOARD_HEIGHT / 2) + 1)))
-        mov     x2, x28
-        bl      draw_board_frame
 
         add     x0, sp, GAME_STATS
         mov     x1, x28
@@ -465,6 +457,43 @@ draw_canvas__next_pixel:
         b.gt    draw_canvas__next_pixel // Loop if pixels remain
 
         ldp     lr, x19, [sp], 16
+        ret
+
+
+/*
+ * Params:
+ *      x0: u64                         <- bottom left x coordinate (game coordinates)
+ *      x1: u64                         <- bottom left y coordinate (game coordinates)
+ *      x2: in struct BoardState*       <- board state
+ *      x3: in struct TetrominoState*   <- tetromino state
+ *      x4: in/out u32*                 <- framebuffer
+ */
+draw_board:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        mov     x20, x0
+        mov     x21, x1
+        mov     x22, x2
+        mov     x23, x3
+        mov     x19, x4
+
+        add     x0, x20, TETRIS_CELL_SIZE
+        add     x1, x21, TETRIS_CELL_SIZE
+        mov     x2, x22
+        mov     x3, x23
+        mov     x4, x19
+        bl      draw_board_inner
+
+        mov     x0, x20
+        mov     x1, x21
+        mov     x2, x19
+        bl      draw_board_frame
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
         ret
 
 
