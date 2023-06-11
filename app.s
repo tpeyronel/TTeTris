@@ -255,10 +255,16 @@ game_loop__keep_tetromino:
         bl      particle_manager_render
 
 
-        mov     x0, sp
-        mov     x1, x28
-        bl      draw_board
+        // mov     x0, sp
+        // mov     x1, x28
+        // bl      draw_board
 
+        mov     x0, ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * (BOARD_WIDTH / 2)))
+        mov     x1, ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * (BOARD_HEIGHT / 2)))
+        add     x2, sp, BOARD_STATE
+        add     x3, sp, TETROMINO_STATE
+        mov     x4, x28
+        bl      draw_board_inner
 
         add     x0, sp, GAME_STATS
         mov     x1, x28
@@ -458,157 +464,191 @@ draw_canvas__next_pixel:
 
 
 
+/*
+ * Params:
+ *      x0: u64                         <- bottom left x coordinate (game coordinates)
+ *      x1: u64                         <- bottom left y coordinate (game coordinates)
+ *      x2: in struct BoardState*       <- board state
+ *      x3: in struct TetrominoState*   <- tetromino state
+ *      x4: in/out u32*                 <- framebuffer
+ */
+draw_board_inner:
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+        stp     x26, x27, [sp, 64]
+
+        mov     x20, x0         // x20 <- bottom left x coordinate
+        mov     x21, x1         // x21 <- bottom left y coordinate
+        mov     x22, x2         // x22 <- board state
+        mov     x23, x3         // x23 <- tetromino state
+        mov     x24, x4         // x24 <- framebuffer
+
+
+        mov     x26, 0          // x26 <- row iterator
+
+draw_board_inner__next_row:
+        mov     x25, 0          // x25 <- column iterator
+
+draw_board_inner__next_col:
+        mov     x0, x25
+        mov     x1, x26
+        mov     x2, x22
+        mov     x3, x23
+        bl      get_cell_id_with_tetromino_at
+        cbz     x0, draw_board_inner__skip_cell       // skip if cell is air
+        sub     x0, x0, TETROMINO_ID_BIAS       // x0 <- normalized cell id
+
+        bl      get_tetromino_by_index
+        mov     x2, x0                          // x2: in struct Tetromino* <- current tetromino
+
+        mov     x9, TETRIS_CELL_SIZE
+        mul     x0, x9, x25     // x0 <- x offset in coords to current cell
+        add     x0, x20, x0     // x0 <- bottom left x of current cell
+        mul     x1, x9, x26     // x1 <- y offset in coords to current cell
+        add     x1, x21, x1     // x1 <- bottom left y of current cell
+        mov     x3, x24
+        bl      draw_tetris_cell
+
+draw_board_inner__skip_cell:
+        add     x25, x25, 1             // Advance to next column
+        cmp     x25, BOARD_WIDTH        // Check if we finished row
+        b.lt    draw_board_inner__next_col
+        /* We are at the end of the row */
+
+        add     x26, x26, 1             // Advance to next row
+        cmp     x26, BOARD_HEIGHT       // Check if we finished all rows
+        b.lt    draw_board_inner__next_row
+        /* We finished drawing inner board */
+
+
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
+        ret
+
+
 
 /*
  * Params:
- *      mut x0: struct GameState*
- *      mut x1: framebuffer address
+ *      x0: u64                         <- x coordinate 0 <= x < BOARD_WIDTH
+ *      x1: u64                         <- y coordinate 0 <= y < BOARD_HEIGHT
+ *      x2: in struct BoardState*       <- board state
+ *      x3: in struct TetrominoState*   <- tetromino state
+ * Returns:
+ *      x0: u64                         <- 0 or tetromino id + TETROMINO_ID_BIAS
  */
-draw_board:
-        sub     sp, sp, 48
-        stur    lr, [sp]
-        stur    x19, [sp, 8]
-        stur    x20, [sp, 16]
-        stur    x21, [sp, 24]
-        stur    x22, [sp, 32]
-        stur    x23, [sp, 40]
+get_cell_id_with_tetromino_at:
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+        stp     x26, x27, [sp, 64]
 
-        mov     x23, x0
+        mov     x20, x0                 // x20 <- x board coordinate
+        mov     x21, x1                 // x21 <- y board coordinate
+        mov     x22, x2                 // x22 <- board state
+        mov     x23, x3                 // x23 <- tetromino state
 
-        add     x9, x0, (BOARD_STATE + BSTATE_BOARD)
+        ldr     x24, [x3, TSTATE_POS_X] // x24 <- tetromino x
+        ldr     x25, [x3, TSTATE_POS_Y] // x25 <- tetromino y
 
-        mov     x11, x1
+        sub     x24, x0, x24            // x24 <- tetromino x relative to cell x
+        cmp     x24, 0
+        b.lt    get_cell_id_with_tetromino_at__not_tetromino
+        cmp     x24, TETROMINO_BOARD_WIDTH
+        b.ge    get_cell_id_with_tetromino_at__not_tetromino
 
-        add     x0, x0, TETROMINO_STATE
-        bl      get_tetromino
-        mov     x19, x0			// x19 -> tetromino matrix
-        mov     x20, x1			// x20 -> tetromino x pos
-        mov     x21, x2			// x21 -> tetromino y pos
-        mov     x22, x3			// x22 -> tetromino color
+        sub     x25, x1, x25            // x25 <- tetromino y relative to cell y
+        cmp     x25, 0
+        b.lt    get_cell_id_with_tetromino_at__not_tetromino
+        cmp     x25, TETROMINO_BOARD_HEIGHT
+        b.ge    get_cell_id_with_tetromino_at__not_tetromino
 
+        /* Current cell is inside tetromino matrix, we should check that first */
 
+        mov     x0, x3
+        bl      get_tetromino           // x0 <- tetromino data of current tetromino's rotation
 
-        mov    x14, 0             // row iterator
-draw_board_outer:
-        mov     x15, 0             // column iterator
-draw_board_inner:
+        mov     x2, x0                  // x2 <- current tetromino data
+        mov     x0, x24                 // x0 <- tetromino x in tetromino board
+        mov     x1, x25                 // x1 <- tetromino y in tetromino board
+        bl      is_tetromino_cell_air
+        cbnz    x0, get_cell_id_with_tetromino_at__not_tetromino
 
-        cmp     x15, x20
-        b.lt    draw_board_not_tetromino
-
-        add     x12, x20, (TETROMINO_BOARD_WIDTH-1)
-        cmp     x15, x12
-        b.gt    draw_board_not_tetromino
-
-        cmp     x14, x21
-        b.lt    draw_board_not_tetromino
-
-        add     x12, x21, (TETROMINO_BOARD_WIDTH-1)
-        cmp     x14, x12
-        b.gt    draw_board_not_tetromino
-        // if I got here, then I'm currently on a square of the tetromino
-        sub     x0, x15, x20
-        sub     x1, x14, x21
-
-        mov     x4, TETROMINO_BOARD_WIDTH
-        mul     x1, x1, x4
-
-        add     x0, x0, x1
-
-        add     x0, x0, x19
-
-        ldurb   w1, [x0]
-
-        cbz     x1, draw_board_not_tetromino		// draw whatever there is in the board
-        ldur    x12, [x23, TETROMINO_STATE + TSTATE_ID]
-        b       draw_board__draw_tetris_cell
+        /* Current cell belongs to tetromino */
+        ldr     x0, [x23, TSTATE_ID]            // x0 <- cell id without bias
+        add     x0, x0, TETROMINO_ID_BIAS       // x0 <- cell id with bias
+        b       get_cell_id_with_tetromino_at__end
 
 
-draw_board_not_tetromino:
-        ldurb   w12, [x9]
-        mov     x4, 0
-        cbz     x12, draw_board_no_square
+get_cell_id_with_tetromino_at__not_tetromino:
+        mov     x9, BOARD_WIDTH
+        mul     x9, x21, x9
+        add     x9, x9, x20
+        add     x9, x9, BSTATE_BOARD    // x9 <- offset to board cell
+        add     x9, x22, x9             // x9 <- pointer to board cell
 
-        sub     x12, x12, TETROMINO_ID_BIAS
-
-        /*
-        mov x0, x12
-    bl get_tetromino_color
-        mov x4, x0
-        */
-
-draw_board__draw_tetris_cell:
-        mov     x0, x15
-        mov     x1, x14
-        mov     x2, TETRIS_CELL_SIZE
-        mul     x0, x0, x2
-        add     x0, x0, ( (SCREEN_WIDTH - BOARD_WIDTH * TETRIS_CELL_SIZE) / 2 )
-        mul     x1, x1, x2
-        add     x1, x1, ( (SCREEN_HEIGH - BOARD_HEIGHT * TETRIS_CELL_SIZE) / 2 )
-
-        mov     x2, x12
-        mov     x3, STRUCT_TETROMINO_SIZE
-        mul     x2, x2, x3
-        ldr     x3, =TETROMINOS
-        add     x2, x2, x3
-
-        mov     x3, x11
-
-        sub     sp, sp, 48
-        stur    x11, [sp]
-        stur    x12, [sp, 8]
-        stur    x13, [sp, 16]
-        stur    x14, [sp, 24]
-        stur    x15, [sp, 32]
-        stur    x9, [sp, 40]
-
-        bl      draw_tetris_cell
-
-        ldur    x11, [sp]
-        ldur    x12, [sp, 8]
-        ldur    x13, [sp, 16]
-        ldur    x14, [sp, 24]
-        ldur    x15, [sp, 32]
-        ldur    x9, [sp, 40]
-        add     sp, sp, 48
-
-        b       draw_board__finished_tetris_cell
-
-draw_board_no_square:    // draw bakcground
-        mov     x0, x15
-        mov     x1, x14
-        mov     x2, TETRIS_CELL_SIZE
-        mul     x0, x0, x2
-        add     x0, x0, ( (SCREEN_WIDTH - BOARD_WIDTH * TETRIS_CELL_SIZE) / 2 )
-        mul     x1, x1, x2
-        add     x1, x1, ( (SCREEN_HEIGH - BOARD_HEIGHT * TETRIS_CELL_SIZE) / 2 )
-        mov     x3, x11
-
-        bl      draw_filled_square
-
-draw_board__finished_tetris_cell:
-        add     x15, x15, 1
-        add     x9, x9, 1
-        cmp     x15, BOARD_WIDTH
-        b.lt    draw_board_inner
-
-        add     x14, x14, 1
-        cmp     x14, BOARD_HEIGHT
-        b.eq    draw_board_end
-
-        b       draw_board_outer
-
-draw_board_end:
+        ldrb    w0, [x9]        // x0 <- cell id (already has bias)
+        b       get_cell_id_with_tetromino_at__end
 
 
-        ldur    x23, [sp, 40]
-        ldur    x22, [sp, 32]
-        ldur    x21, [sp, 24]
-        ldur    x20, [sp, 16]
-        ldur    x19, [sp, 8]
-        ldur    lr, [sp]
-        add     sp, sp, 48
+get_cell_id_with_tetromino_at__end:
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
         ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- tetromino index 0 <= i < NUM_TETROMINOS
+ * Returns:
+ *      x0: in struct Tetromino*        <- tetromino of current tetromino
+ */
+get_tetromino_by_index:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x9, STRUCT_TETROMINO_SIZE       // x0 <- size of tetromino in bytes
+        mul     x9, x9, x0                      // x9 <- offset to tetromino in bytes
+        ldr     x0, =TETROMINOS                 // x0 <- pointer to first tetromino
+        add     x0, x0, x9                      // x0 <- pointer to current tetromino
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- x tetromino board coordinate 0 <= x < TETROMINO_BOARD_WIDTH
+ *      x1: u64                         <- y tetromino board coordinate 0 <= y < TETROMINO_BOARD_HEIGHT
+ *      x2: in struct TetrominoData*    <- tetromino data
+ * Returns:
+ *      x0: bool                        <- is TetrominoData[y][x] air
+ */
+is_tetromino_cell_air:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x9, TETROMINO_BOARD_WIDTH
+        mul     x9, x1, x9                      // x9 <- vertical offset
+        add     x9, x9, x0                      // x9 <- vertical offset + horizontal offset
+        add     x9, x9, TDATA
+        add     x9, x2, x9                      // x9 <- pointer to cell at (x, y)
+
+        ldrb    w9, [x9]                        // x9 <- cell at (x, y)
+        cmp     x9, 0                           // Check if cell is air
+        cset    x0, eq                          // x0 = is_air() ? 1 : 0
+
+        ldp     lr, x19, [sp], 16
+        ret
+
 
 
 /*
