@@ -245,6 +245,7 @@ game_loop:
         bl      process_input
 
         mov     x0, sp
+        mov     x1, x28
         bl      tetromino_fall
         cbz     x0, game_loop__keep_tetromino
         /* We have just placed a tetromino, and we need to get a new one */
@@ -262,8 +263,6 @@ game_loop__keep_tetromino:
 
 
 
-
-
         ldr     x0, [sp, TETROMINO_STATE + TSTATE_ID]
         bl      index_bg_color
         mov     w23, w0
@@ -275,6 +274,11 @@ game_loop__keep_tetromino:
         mov     x0, sp
         mov     x1, x28
         bl      draw_board
+
+
+        add     x0, sp, GAME_STATS
+        mov     x1, x28
+        bl      draw_stats
 
 
         mov     x0, sp
@@ -818,6 +822,49 @@ draw_board_end:
         ret
 
 
+/*
+ * Params:
+ *      x0: in struct GameStats*        <- game stats
+ *      x1: out u32*                    <- framebuffer
+ */
+draw_stats:
+        stp     lr, x19, [sp, -16]!
+        sub     sp, sp, STRUCT_DNI_SIZE
+
+        mov     x9, SCREEN_WIDTH - 16
+        str     x9, [sp, DNI_POS_X]
+
+        mov     x9, 16
+        str     x9, [sp, DNI_POS_Y]
+
+        ldr     x9, [x0, GS_COMPLETED_ROWS]
+        str     x9, [sp, DNI_VALUE]
+
+        mov     x9, 5
+        str     x9, [sp, DNI_MAX_DIGITS]
+
+        mov     x9, 32
+        str     x9, [sp, DNI_DIGIT_WIDTH]
+
+        mov     x9, 6
+        str     x9, [sp, DNI_DIGIT_THICKNESS]
+
+        mov     x9, 4
+        str     x9, [sp, DNI_DIGIT_SPACING]
+
+        ldr     w9, =0xFFFFFFFF
+        str     w9, [sp, DNI_COLOR]
+
+        mov     x0, sp
+        mov     x1, x1
+        bl      draw_number
+
+        add     sp, sp, STRUCT_DNI_SIZE
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
 
 /*
  * Params:
@@ -1186,8 +1233,8 @@ handle_space:
         and     x19, x0, GPIO_SPACE
         cbz     x19, handle_space__end
 
-        sub     sp, x1, TETROMINO_STATE
-        b       restart
+        // sub     sp, x1, TETROMINO_STATE
+        // b       restart
 
 handle_space__end:
         ldp     lr, x19, [sp], 16
@@ -1240,7 +1287,7 @@ clamp_player_coords__end_top:
 
 /*
  * Params:
- *      x0: struct GameState*
+ *      x0: struct GameState*   <- game state
  */
 tetromino_fall:
         sub sp, sp, 64
@@ -1294,12 +1341,7 @@ tetromino_fall:
 
         ldur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
         add     x1, x0, x1                                   // Update completed rows
-        ldur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
-
-        mov     x0, 638
-        mov     x1, 1
-        bl      draw_number
-
+        stur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
 
         mov x0, 1
         b tetromino_fall__fullend
@@ -2241,7 +2283,7 @@ binary_to_decimal__end:
  *      x2: u64         <- width  =>  height = 2 * width - 1
  *      w3: u8          <- binary digit in range [0..9]
  *      w4: u32         <- color
- *      x5: out u8*     <- beginning of framebuffer
+ *      x5: out u32*    <- beginning of framebuffer
  */
 draw_decimal_digit:
         stp     lr, x19, [sp, -64]!
@@ -2368,7 +2410,7 @@ draw_decimal_digit__skip_seg_6:
  *      x3: u64         <- thickness
  *      w4: u8          <- binary digit in range [0..9] U { 10 (minus) }
  *      w5: u32         <- color
- *      x6: out u8*     <- beginning of framebuffer
+ *      x6: out u32*    <- beginning of framebuffer
  */
 draw_decimal_digit_with_thickness:
         stp     lr, x19, [sp, -80]!
@@ -2523,7 +2565,7 @@ draw_decimal_digit_with_thickness__skip_seg_6:
  *      x0: u64         <- bottom right x coordinate        (left) 0 <= x < SCREEN_WIDTH (right)
  *      x1: u64         <- bottom right y coordinate      (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      w2: u32         <- color
- *      x3: out u8*     <- beginning of framebuffer
+ *      x3: out u32*    <- beginning of framebuffer
  */
 draw_time:
         stp     lr, x19, [sp, -16]!
@@ -2583,7 +2625,7 @@ draw_time:
 /*
  * Params:
  *      x0: in/out struct DrawNumberInfo*       <- draw_number_info   (consumed)
- *      x1: out u8*                             <- beginning of framebuffer
+ *      x1: out u32*                            <- beginning of framebuffer
  */
 draw_number:
         stp     lr, x19, [sp, -48]!
