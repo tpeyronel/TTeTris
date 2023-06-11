@@ -8,6 +8,8 @@
         .include "./triangle.s"
         .include "./particle.s"
         .include "./util.s"
+        .include "./rand.s"
+        .include "./background.s"
 
         .equ MOVEMENT_PER_STEP,         16
 
@@ -55,7 +57,7 @@
         .equ DIGIT_SEGMENT_6,           1 << 6
 
 
-        .equ BACKGROUND_COLOR,          0xFF00001F
+        .equ BACKGROUND_COLOR,          0xFF000000
 
 
         BG_COLORS: .word 0x00FF0000, 0x00FFFF00, 0x0000FF00, 0x0000FFFF, 0x000000FF, 0x001E1E1E, 0x00000000
@@ -191,26 +193,30 @@ restart:
         bl      init_game_state
 
 
-        add     x0, sp, PARTICLE_MANAGER
-        mov     x1, 128
-        mov     x2, 64
-        mov     x3, 32
-        ldr     w4, =0xFFFF00FF
-        bl      particle_manager_create_star
+        // add     x0, sp, PARTICLE_MANAGER
+        // mov     x1, 128
+        // mov     x2, 64
+        // mov     x3, 32
+        // ldr     w4, =0xFFFF00FF
+        // bl      particle_manager_create_star
+
+        // add     x0, sp, PARTICLE_MANAGER
+        // mov     x1, 105
+        // mov     x2, 179
+        // mov     x3, 24
+        // ldr     w4, =0xFF00FFFF
+        // bl      particle_manager_create_star
+
+        // add     x0, sp, PARTICLE_MANAGER
+        // mov     x1, 417
+        // mov     x2, 78
+        // mov     x3, 64
+        // ldr     w4, =0xFF00FF00
+        // bl      particle_manager_create_star
+
 
         add     x0, sp, PARTICLE_MANAGER
-        mov     x1, 105
-        mov     x2, 179
-        mov     x3, 24
-        ldr     w4, =0xFF00FFFF
-        bl      particle_manager_create_star
-
-        add     x0, sp, PARTICLE_MANAGER
-        mov     x1, 417
-        mov     x2, 78
-        mov     x3, 64
-        ldr     w4, =0xFF00FF00
-        bl      particle_manager_create_star
+        bl      create_background_starfield
 
 
 
@@ -2015,33 +2021,6 @@ choose_next_tetromino__dont_recreate:
 
 
         ldp     lr, x19, [sp], 16
-        ret
-
-
-
-/*
- * Params:
- *      w0: u32         <- min (inclusive)
- *      w1: u32         <- max (exclusive)
- * Returns:
- *      w0: u32         <- random number in range [min; max)
- */
-rand_gen_in_range:
-        stp     lr, x19, [sp, -32]!
-        stp     x20, x21, [sp, 16]
-
-        ldr     x19, =RNG_NUMBER_ADDRESS
-        ldr     w19, [x19]              // w19 <- random number in range [0..U32_MAX]
-
-        sub     w20, w1, w0             // w20 <- max - min == length of range
-        udiv    w21, w19, w20           // w21 <- R div (max - min)
-        mul     w21, w21, w20           // w21 <- (R div (max - min)) * (max - min)
-
-        sub     w19, w19, w21           // w19 <- remainder of R / (max - min), in range [0..(max - min))
-        add     w0, w19, w0             //  w0 <- offseted remainder, in range [min..max)
-
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 32
         ret
 
 

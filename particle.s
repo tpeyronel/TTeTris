@@ -6,7 +6,7 @@ PARTICLE_S:
         .include "./util.s"
         .include "./fixed_point.s"
 
-        .equ MAX_PARTICLES,     128
+        .equ MAX_PARTICLES,     256
 
 /* struct ParticleState */
         .equ PS_TIMESTAMP,      0                       // u32
