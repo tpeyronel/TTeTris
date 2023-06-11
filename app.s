@@ -683,8 +683,311 @@ get_cell_id_with_tetromino_at:
         mov     x22, x2                 // x22 <- board state
         mov     x23, x3                 // x23 <- tetromino state
 
-	mov     x19, GPIO_BASE
-	ldr     w2, [x19, GPIO_GPLEV0]
+        ldr     x24, [x3, TSTATE_POS_X] // x24 <- tetromino x
+        ldr     x25, [x3, TSTATE_POS_Y] // x25 <- tetromino y
+
+        sub     x24, x0, x24            // x24 <- tetromino x relative to cell x
+        cmp     x24, 0
+        b.lt    get_cell_id_with_tetromino_at__not_tetromino
+        cmp     x24, TETROMINO_BOARD_WIDTH
+        b.ge    get_cell_id_with_tetromino_at__not_tetromino
+
+        sub     x25, x1, x25            // x25 <- tetromino y relative to cell y
+        cmp     x25, 0
+        b.lt    get_cell_id_with_tetromino_at__not_tetromino
+        cmp     x25, TETROMINO_BOARD_HEIGHT
+        b.ge    get_cell_id_with_tetromino_at__not_tetromino
+
+        /* Current cell is inside tetromino matrix, we should check that first */
+
+        mov     x0, x3
+        bl      get_tetromino           // x0 <- tetromino data of current tetromino's rotation
+
+        mov     x2, x0                  // x2 <- current tetromino data
+        mov     x0, x24                 // x0 <- tetromino x in tetromino board
+        mov     x1, x25                 // x1 <- tetromino y in tetromino board
+        bl      is_tetromino_cell_air
+        cbnz    x0, get_cell_id_with_tetromino_at__not_tetromino
+
+        /* Current cell belongs to tetromino */
+        ldr     x0, [x23, TSTATE_ID]            // x0 <- cell id without bias
+        add     x0, x0, TETROMINO_ID_BIAS       // x0 <- cell id with bias
+        b       get_cell_id_with_tetromino_at__end
+
+
+get_cell_id_with_tetromino_at__not_tetromino:
+        mov     x9, BOARD_WIDTH
+        mul     x9, x21, x9
+        add     x9, x9, x20
+        add     x9, x9, BSTATE_BOARD    // x9 <- offset to board cell
+        add     x9, x22, x9             // x9 <- pointer to board cell
+
+        ldrb    w0, [x9]        // x0 <- cell id (already has bias)
+        b       get_cell_id_with_tetromino_at__end
+
+
+get_cell_id_with_tetromino_at__end:
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- tetromino index 0 <= i < NUM_TETROMINOS
+ * Returns:
+ *      x0: in struct Tetromino*        <- tetromino of current tetromino
+ */
+get_tetromino_by_index:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x9, STRUCT_TETROMINO_SIZE       // x0 <- size of tetromino in bytes
+        mul     x9, x9, x0                      // x9 <- offset to tetromino in bytes
+        ldr     x0, =TETROMINOS                 // x0 <- pointer to first tetromino
+        add     x0, x0, x9                      // x0 <- pointer to current tetromino
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- x tetromino board coordinate 0 <= x < TETROMINO_BOARD_WIDTH
+ *      x1: u64                         <- y tetromino board coordinate 0 <= y < TETROMINO_BOARD_HEIGHT
+ *      x2: in struct TetrominoData*    <- tetromino data
+ * Returns:
+ *      x0: bool                        <- is TetrominoData[y][x] air
+ */
+is_tetromino_cell_air:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x9, TETROMINO_BOARD_WIDTH
+        mul     x9, x1, x9                      // x9 <- vertical offset
+        add     x9, x9, x0                      // x9 <- vertical offset + horizontal offset
+        add     x9, x9, TDATA
+        add     x9, x2, x9                      // x9 <- pointer to cell at (x, y)
+
+        ldrb    w9, [x9]                        // x9 <- cell at (x, y)
+        cmp     x9, 0                           // Check if cell is air
+        cset    x0, eq                          // x0 = is_air() ? 1 : 0
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- bottom right x (game coordinates)
+ *      x1: u64                         <- bottom right y (game coordinates)
+ *      x2: in struct GameStats*        <- game stats
+ *      x3: out u32*                    <- framebuffer
+ */
+draw_stats:
+        stp     lr, x19, [sp, -16]!
+        sub     sp, sp, STRUCT_DNI_SIZE
+
+        str     x0, [sp, DNI_POS_X]
+        str     x1, [sp, DNI_POS_Y]
+
+        ldr     x9, [x2, GS_COMPLETED_ROWS]
+        str     x9, [sp, DNI_VALUE]
+
+        mov     x9, 5
+        str     x9, [sp, DNI_MAX_DIGITS]
+
+        mov     x9, 48
+        str     x9, [sp, DNI_DIGIT_WIDTH]
+
+        mov     x9, 12
+        str     x9, [sp, DNI_DIGIT_THICKNESS]
+
+        mov     x9, 12
+        str     x9, [sp, DNI_DIGIT_SPACING]
+
+        ldr     w9, =0xFFFFFFFF
+        str     w9, [sp, DNI_COLOR]
+
+        mov     x0, sp
+        mov     x1, x3
+        bl      draw_number
+
+        add     sp, sp, STRUCT_DNI_SIZE
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+
+/*
+ * Params:
+ *      x0: struct GameState*   <- game state
+ *	x1: in/out u32*         <- framebuffer
+ */
+draw_destroy_particles:
+        sub     sp, sp, 72
+        stur    lr, [sp]
+        stur    x19, [sp, 8]
+        stur    x20, [sp, 16]
+        stur    x21, [sp, 24]
+        stur    x22, [sp, 32]
+        stur    x23, [sp, 40]
+        stur    x24, [sp, 48]
+        stur    x25, [sp, 56]
+        stur    x26, [sp, 64]
+
+        add     x19, x0, (BOARD_STATE + BSTATE_DESTROYED_ROWS)
+        mov     x24, x0
+
+        add     x0, x0, LAST_DROP
+        ldur    x0, [x0]
+        mov     x20, x0
+
+        mov     x21, ( (SCREEN_WIDTH - BOARD_WIDTH * TETRIS_CELL_SIZE) / 2 )
+        sub     x21, x21, TETRIS_CELL_SIZE
+
+        mov     x22, ( (TETRIS_CELL_SIZE + SCREEN_HEIGH - BOARD_HEIGHT * TETRIS_CELL_SIZE) / 2 )
+
+        mov     x23, x1
+
+        mov     x2, 4
+
+draw_destroy_particles__loop:
+        ldurb   w3, [x19]
+
+        cmp     x3, 0xff
+        b.eq    draw_destroy_particles__end
+
+        sub     sp, sp, 8
+        stur    x2, [sp]
+
+        mov     x0, x20
+        bl      get_elapsed_time
+        lsl     x0, x0, 5
+        ldr     w2, =US_PER_AUTO_DROP
+        udiv    x4, x0, x2
+        mov     x5, 1
+        lsl     x5, x5, 5
+        sub     x5, x5, x4
+        mov     x0, DESTROY_PARTICLE_RADIUS
+        mul     x2, x5, x0
+        lsr     x2, x2, 5
+        mov     x10, x2
+        mov     x25, x2
+
+        /*
+        cmp x10, 0
+        b.le draw_destroy_particles__destroy
+        */
+
+
+        mov     x2, 50
+        mul     x4, x4, x2
+        lsr     x4, x4, 5
+        mov     x24, x4
+
+        mov     x26, TETRIS_CELL_SIZE
+        mul     x26, x26, x3
+
+        sub     x0, x21, x24
+
+        add     x1, x22, x26
+
+        mov     x2, x23
+        mov     x3, x25
+        ldr     x4, =DESTROY_PARTICLE_COLOR
+        bl      draw_circle_at
+
+        mov     x0, SCREEN_WIDTH
+        sub     x0, x0, x21
+        add     x0, x0, x24
+
+        add     x1, x22, x26
+
+        mov     x2, x23
+        mov     x3, x25
+        ldr     x4, =DESTROY_PARTICLE_COLOR
+        bl      draw_circle_at
+
+        ldur    x2, [sp]
+        add     sp, sp, 8
+
+        sub     x2, x2, 1
+        add     x19, x19, 1
+        cbnz    x2, draw_destroy_particles__loop
+        b       draw_destroy_particles__end
+
+draw_destroy_particles__destroy:
+        /*
+        mov x0, x24
+        add x0, x0, BOARD_STATE + BSTATE_DESTROYED_ROWS
+        movz x1, 0xff, lsl 00
+        sturb w1, [x0]
+        */
+
+draw_destroy_particles__end:
+
+        ldur    x26, [sp, 64]
+        ldur    x25, [sp, 56]
+        ldur    x24, [sp, 48]
+        ldur    x23, [sp, 40]
+        ldur    x22, [sp, 32]
+        ldur    x21, [sp, 24]
+        ldur    x20, [sp, 16]
+        ldur    x19, [sp, 8]
+        ldur    lr, [sp]
+        add     sp, sp, 72
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct InputState*
+ */
+read_input:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        ldr     w19, [x0, PRESSED_STATE]        // Load last pressed state to compute on press state
+
+	mov     x20, GPIO_BASE
+	ldr     w20, [x20, GPIO_GPLEV0]         // w20 = new pressed state
+
+        // Input in bit 'n' is "on press" if current pressed state is 1 and previous pressed state is 0
+        mvn     w19, w19                        // Bitwise NOT last pressed state
+        and     w21, w20, w19                   // w21 = new on press state
+
+        str     w20, [x0, PRESSED_STATE]
+        str     w21, [x0, ON_PRESS_STATE]
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: const struct InputState*
+ *      x1: mut struct TetrominoState*
+ *      x2: const struct BoardState*      // Para chequear colision en los handle (MEJORARLO)
+ */
+process_input:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x19, x0         // x19 = const struct InputState*
+        mov     x20, x1         // x20 = mut struct TetrominoState*
+        mov 	x21, x2         // x21 = const struct BoardState*
+
+        ldr     w0, [x19, ON_PRESS_STATE]
+        mov     x1, x20
 
         bl      handle_w
         bl      handle_a
@@ -2229,6 +2532,5 @@ test_binary_to_decimal__again:
 
         ldp     lr, x19, [sp], 16
         ret
-
 
 
