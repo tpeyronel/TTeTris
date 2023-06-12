@@ -185,10 +185,10 @@ main:
 	mov     x9, GPIO_BASE
 	str     wzr, [x9, GPIO_GPFSEL0]
 
-restart:
         // Allocate and init struct GameState
         mov     x9, STRUCT_GAME_STATE_SIZE
         sub     sp, sp, x9
+restart:
         mov     x0, sp
         bl      init_game_state
 
@@ -1191,8 +1191,8 @@ handle_space:
         and     x19, x0, GPIO_SPACE
         cbz     x19, handle_space__end
 
-        // sub     sp, x1, TETROMINO_STATE
-        // b       restart
+         sub     sp, x1, TETROMINO_STATE
+         b       restart
 
 handle_space__end:
         ldp     lr, x19, [sp], 16
@@ -1508,8 +1508,9 @@ update_board__next_elem:
 
 update_board__row_complete:
         add     x6, x9, x10
+		add		x6, x6, BSTATE_DESTROYED_ROWS
         add     x7, x0, x10
-        sturb   w7, [x6, BSTATE_DESTROYED_ROWS]
+        sturb   w7, [x6]
 
         add     x10, x10, 1
 
@@ -1653,7 +1654,7 @@ fall_one_block:
         add     x15, x15, x0    // starts at first square from desired line x8
 
 keepgoing:
-        add     x5, x15, 10
+        add     x5, x15, BOARD_WIDTH
 
         ldur    x2, [x5]         // get info from square avobe
         sturb   w2, [x15]       // replace current square with new info
@@ -1664,7 +1665,7 @@ keepgoing:
         cmp     x5, BOARD_SIZE-1
         bne     keepgoing         // stop before reaching top line of grid (x15 at square #189, x5 at #199)
 
-        mov     x1, 19
+        mov     x1, BOARD_HEIGHT - 1 
         bl      erase_board_line   // Erase anything on top line
 
         ldur    lr, [sp]
