@@ -322,7 +322,11 @@ game_over:
  *      x1: out u32*            <- dst framebuffer
  */
 copy_framebuffer:
-        stp     lr, x19, [sp, -16]!
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+        stp     x26, x27, [sp, 64]
 
         ldr     x19, =SCREEN_PIXELS     // x19 = width * height
         lsl     x19, x19, BYTES_PER_PIXEL_SHIFT
@@ -333,18 +337,31 @@ copy_framebuffer__next_pixel:
         ldp     x11, x12, [x0, 16]
         ldp     x13, x14, [x0, 32]
         ldp     x15, x16, [x0, 48]
+        ldp     x20, x21, [x0, 64]
+        ldp     x22, x23, [x0, 80]
+        ldp     x24, x25, [x0, 96]
+        ldp     x26, x27, [x0, 112]
+
         stp     x9, x10, [x1]
         stp     x11, x12, [x1, 16]
         stp     x13, x14, [x1, 32]
         stp     x15, x16, [x1, 48]
+        stp     x20, x21, [x1, 64]
+        stp     x22, x23, [x1, 80]
+        stp     x24, x25, [x1, 96]
+        stp     x26, x27, [x1, 112]
 
-        add     x0, x0, 64
-        add     x1, x1, 64
+        add     x0, x0, 128
+        add     x1, x1, 128
         cmp     x0, x19
         b.lt    copy_framebuffer__next_pixel
 
 
-        ldp     lr, x19, [sp], 16
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
         ret
 
 
