@@ -194,28 +194,6 @@ restart:
         bl      init_game_state
 
 
-        // add     x0, sp, PARTICLE_MANAGER
-        // mov     x1, 128
-        // mov     x2, 64
-        // mov     x3, 32
-        // ldr     w4, =0xFFFF00FF
-        // bl      particle_manager_create_star
-
-        // add     x0, sp, PARTICLE_MANAGER
-        // mov     x1, 105
-        // mov     x2, 179
-        // mov     x3, 24
-        // ldr     w4, =0xFF00FFFF
-        // bl      particle_manager_create_star
-
-        // add     x0, sp, PARTICLE_MANAGER
-        // mov     x1, 417
-        // mov     x2, 78
-        // mov     x3, 64
-        // ldr     w4, =0xFF00FF00
-        // bl      particle_manager_create_star
-
-
         add     x0, sp, PARTICLE_MANAGER
         bl      create_background_starfield
 
@@ -1341,10 +1319,6 @@ update_destroy_particles__loop:
 
 
 
-
-
-
-
 // Tries to move tetromino one position down.
 /*
  * Params:
@@ -1868,110 +1842,6 @@ check_collision__end_end:
         ldp     lr, x19, [sp], 64
         ret
 
-
-
-// /*
-//  * Params:
-//  *      x0: in struct TetrominoState*   <- tetromino_state
-//  *      x1: in struct BoardState*       <- board_state
-//  * Returns:
-//  *      x0: enum CollisionResult        <- collision_result
-//  */
-// check_collision:
-//         stp     lr, x19, [sp, -48]!
-//         stp     x20, x21, [sp, 16]
-//         stp     x22, x23, [sp, 32]
-//
-//
-//         ldr     x19, [x0, TSTATE_ID]                    // x19 <- current tetromino index
-//         mov     x9, STRUCT_TETROMINO_SIZE               //  x9 <- sizeof(struct Tetromino)
-//         mul     x19, x19, x9                            // x19 <- offset in bytes to current tetromino (relative to start of array)
-//         add     x19, x19, TETROMINOS + TETROMINO_ROTS   // x19 <- pointer to rotations of current tetromino
-//
-//         ldr     x20, [x0, TSTATE_ROT]           // x20 <- current rotation index
-//         mov     x9, STRUCT_TDATA_SIZE           //  x9 <- sizeof(struct TetrominoData)
-//         mul     x20, x20, x9                    // x20 <- offset in bytes to current rotation
-//
-//         add     x1, x1, BSTATE_BOARD            //  x1 <- pointer to board matrix
-//         ldr     x10, [x0, TSTATE_POS_X]         // x10 <- tetromino pos x
-//         ldr     x11, [x0, TSTATE_POS_Y]         // x11 <- tetromino pos y
-//         add     x19, x19, x20                   // x19 <- pointer to current rotation
-//
-//         /* Iterators */
-//         mov     x20, 0                          // x20 <- x coordinate in tetromino matrix
-//         mov     x21, 0                          // x21 <- y coordinate in tetromino matrix
-//
-//         /* Start loop for each block in tetromino */
-// check_collision__check_next_block:
-//         /* Index block at (x20, x21) of tetromino */
-//         mov     x9, TETROMINO_BOARD_WIDTH
-//         mul     x9, x9, x21                             // x9 <- vertical offset to current tetromino block
-//         add     x9, x9, x20                             // x9 <- vertical + horizontal offset to current tetromino block
-//         lsl     x9, x9, BYTES_PER_TETROMINO_BLOCK_SHIFT // x9 <- vertical + horizontal offset in bytes to current tetromino block
-//         add     x9, x19, x9                             // x9 <- pointer to current tetromino block
-//         ldr     x9, [x9]                                // x9 <- current tetromino block
-//
-//         cbz     x9, check_collision__next       // go to next block if current block is zero (nothing to check)
-//
-//         /* Current block is not air */
-//
-//         add     x22, x20, x10   // x22 <- pos x of block to check relative to origin of board
-//         add     x23, x21, x11   // x23 <- pos y of block to check relative to origin of board
-//
-//         // Check 0 <= x22 < BOARD_WIDTH
-//         cmp     x22, 0
-//         b.lt    check_collision__out_of_bounds
-//         cmp     x22, BOARD_WIDTH
-//         b.ge    check_collision__out_of_bounds
-//         // Check 0 <= x23 < BOARD_HEIGHT
-//         cmp     x23, 0
-//         b.lt    check_collision__out_of_bounds
-//         cmp     x23, BOARD_HEIGHT
-//         b.ge    check_collision__out_of_bounds
-//
-//         /* Block is inside board */
-//
-//         /* Index block at (x22, x23) in board */
-//         mov     x9, BOARD_WIDTH
-//         mul     x9, x9, x23                             // x9 <- vertical offset to block in board
-//         add     x9, x9, x22                             // x9 <- vertical + horizontal offset to block in board
-//         lsl     x9, x9, BYTES_PER_TETROMINO_BLOCK_SHIFT // x9 <- vertical + horizontal offset in bytes to block in board
-//         add     x9, x1, x9                              // x9 <- pointer to block in board
-//         ldr     x9, [x9]                                // x9 <- block at (x22, x23) in board
-//
-//         cbnz    x9, check_collision__existing_block     // branch if there's already a block in board
-//
-//         /* Block is not on top of another one. Check finished */
-//
-// check_collision__next:
-//         add     x20, x20, 1                     // advance x pos
-//         cmp     x20, TETROMINO_BOARD_WIDTH      // check if there are remaining blocks in current row
-//         b.lt    check_collision__check_next_block
-//         /* We are at end of row */
-//
-//         mov     x20, 0                          // set x to beginning of row
-//         add     x21, x21, 1                     // advance y pos
-//         cmp     x20, TETROMINO_BOARD_WIDTH      // check if there are remaining rows of tetromino
-//         b.lt    check_collision__check_next_block
-//         /* We finished checking entire tetromino */
-//
-//         mov     x0, COLLISION_RESULT_NO_COLLISION
-//         b       check_collision__end
-//
-// check_collision__out_of_bounds:
-//         mov     x0, COLLISION_RESULT_OUT_OF_BOUNDS
-//         b       check_collision__end
-//
-// check_collision__existing_block:
-//         mov     x0, COLLISION_RESULT_EXISTING_BLOCK
-//         b       check_collision__end
-//
-//
-// check_collision__end:
-//         ldp     x22, x23, [sp, 32]
-//         ldp     x20, x21, [sp, 16]
-//         ldp     lr, x19, [sp], 48
-//         ret
 
 
 /*
