@@ -1192,18 +1192,60 @@ handle_d__end:
 
 /*
  * Params:
- *      x0: in/out bool* (u64*)                 <- &is_paused
- *      x1: in/out struct TetrominoState*       <- tetromino state
+ *      x0: in/out struct GameState*            <- game state
  */
 handle_space:
         stp     lr, x19, [sp, -16]!
 
-        ldr     x9, [x0]
-        cmp     x9, 0
-        cset    x9, eq
-        str     x9, [x0]
+        ldr     x9, [x0, IS_PAUSED]
+        cbz     x9, handle_space__pause_game
+        cbnz    x9, handle_space__restart_game
+
+handle_space__pause_game:
+        mov     x9, 1
+        str     x9, [x0, IS_PAUSED]
+        b       handle_space__end
+
+handle_space__restart_game:
+        bl      restart_game
+        b       handle_space__end
 
 handle_space__end:
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct GameState*    <- game state
+ */
+restart_game:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x0                 // x19 <- game_state
+
+        str     xzr, [x19, IS_PAUSED]
+
+        bl      get_time
+        str     w0, [x19, LAST_DROP]
+
+        add     x0, x19, TETROMINO_STATE
+        bl      init_tetromino_state
+
+        add     x0, x19, CHOOSER_BAG_STATE
+        bl      recreate_chooser_bag
+
+        add     x0, x19, CHOOSER_BAG_STATE
+        bl      choose_next_tetromino
+        stur    x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Set first tetromino.
+
+        add	x0, x19, BOARD_STATE
+        bl	init_board_state
+
+        add 	x0, x19, GAME_STATS
+        bl 	init_game_stats
+
         ldp     lr, x19, [sp], 16
         ret
 
