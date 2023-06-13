@@ -72,7 +72,8 @@
         .equ COLLISION_RESULT_EXISTING_BLOCK,   0b10
 
 /* struct GameState */
-        .equ LAST_TICK,                 0                                               // u32
+        .equ IS_PAUSED,                 0                                               // bool (u64)
+        .equ LAST_TICK,                 IS_PAUSED + 8                                   // u32
         .equ LAST_DROP,                 LAST_TICK + 4                                   // u32
         .equ TICK_COUNTER,              LAST_DROP + 4                                   // u64
         .equ GAME_STATS,                TICK_COUNTER + 8                                // struct GameStats
@@ -209,10 +210,11 @@ game_loop:
         add     x0, sp, INPUT_STATE
         bl      read_input
 
-        add     x0, sp, INPUT_STATE
-        add     x1, sp, TETROMINO_STATE
-        add     x2, sp, BOARD_STATE
+        mov     x0, sp
         bl      process_input
+
+        ldr     x9, [sp, IS_PAUSED]
+        cbnz    x9, game_loop__dont_update
 
         mov     x0, sp
         mov     x1, x28
@@ -229,7 +231,7 @@ game_loop:
 
         sturb   w0, [sp, TETROMINO_STATE + TSTATE_ID]  // Start with new tetromino.
 game_loop__keep_tetromino:
-
+game_loop__dont_update:
 
         mov     x0, x28
         bl      draw_canvas
@@ -352,6 +354,8 @@ init_game_state:
         stp     lr, x19, [sp, -16]!
 
         mov     x19, x0                 // x19 <- game_state
+
+        str     xzr, [x19, IS_PAUSED]
 
         bl      get_time
         str     w0, [x19, LAST_TICK]
@@ -984,30 +988,50 @@ read_input:
 
 /*
  * Params:
- *      x0: const struct InputState*
- *      x1: mut struct TetrominoState*
- *      x2: const struct BoardState*      // Para chequear colision en los handle (MEJORARLO)
+ *      x0: in/out struct GameState*
  */
 process_input:
         stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
 
-        mov     x19, x0         // x19 = const struct InputState*
-        mov     x20, x1         // x20 = mut struct TetrominoState*
-        mov 	x21, x2         // x21 = const struct BoardState*
+        ldr     x19, [x0, INPUT_STATE + ON_PRESS_STATE] // x19 <- on press flags
+        add     x20, x0, TETROMINO_STATE                // x20 <- in/out struct TetrominoState*
+        add 	x21, x0, BOARD_STATE                    // x21 <- in struct BoardState*
 
-        ldr     w0, [x19, ON_PRESS_STATE]
+        tst     x19, GPIO_W
+        b.eq    process_input__end_w
         mov     x1, x20
-
+        mov     x2, x21
         bl      handle_w
+process_input__end_w:
+
+        tst     x19, GPIO_A
+        b.eq    process_input__end_a
+        mov     x1, x20
+        mov     x2, x21
         bl      handle_a
+process_input__end_a:
+
+        tst     x19, GPIO_S
+        b.eq    process_input__end_s
+        mov     x1, x20
+        mov     x2, x21
         bl      handle_s
+process_input__end_s:
+
+        tst     x19, GPIO_D
+        b.eq    process_input__end_d
+        mov     x1, x20
+        mov     x2, x21
         bl      handle_d
+process_input__end_d:
+
+        tst     x19, GPIO_SPACE
+        b.eq    process_input__end_space
+        mov     x1, x20
+        mov     x2, x21
         bl      handle_space
-
-        // mov     x0, x20
-        // bl      clamp_player_coords
-
+process_input__end_space:
 
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
@@ -1027,9 +1051,6 @@ handle_w:
         stur    x19, [sp, 8]
         stur    x20, [sp, 16]
         stur    x21, [sp, 24]
-
-        and     x19, x0, GPIO_W
-        cbz     x19, handle_w__end
 
         mov     x20, x1
 
@@ -1073,9 +1094,6 @@ handle_s:
         stur    x20, [sp, 16]
         stur    x21, [sp, 24]
         stur    x22, [sp, 32]
-
-        and     x19, x0, GPIO_S
-        cbz     x19, handle_s__end
 
         mov     x20, x1
 
@@ -1122,9 +1140,6 @@ handle_a:
         stur    x19, [sp, 8]
         stur    x20, [sp, 16]
 
-        and     x19, x0, GPIO_A
-        cbz     x19, handle_a__end
-
         mov     x20, x1
 
         mov     x0, x1
@@ -1162,9 +1177,6 @@ handle_d:
         stur    x19, [sp, 8]
         stur    x20, [sp, 16]
 
-        and     x19, x0, GPIO_D
-        cbz     x19, handle_d__end
-
         mov     x20, x1
 
         mov     x0, x1
@@ -1198,11 +1210,8 @@ handle_d__end:
 handle_space:
         stp     lr, x19, [sp, -16]!
 
-        and     x19, x0, GPIO_SPACE
-        cbz     x19, handle_space__end
-
-         sub     sp, x1, TETROMINO_STATE
-         b       restart
+        sub     sp, x1, TETROMINO_STATE
+        b       restart
 
 handle_space__end:
         ldp     lr, x19, [sp], 16
