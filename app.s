@@ -995,41 +995,39 @@ process_input:
         stp     x20, x21, [sp, 16]
 
         ldr     x19, [x0, INPUT_STATE + ON_PRESS_STATE] // x19 <- on press flags
-        add     x20, x0, TETROMINO_STATE                // x20 <- in/out struct TetrominoState*
-        add 	x21, x0, BOARD_STATE                    // x21 <- in struct BoardState*
+        mov     x20, x0                                 // x20 <- in/out struct GameState*
 
         tst     x19, GPIO_W
         b.eq    process_input__end_w
-        mov     x1, x20
-        mov     x2, x21
+        add     x0, x20, TETROMINO_STATE
+        add     x1, x20, BOARD_STATE
         bl      handle_w
 process_input__end_w:
 
         tst     x19, GPIO_A
         b.eq    process_input__end_a
-        mov     x1, x20
-        mov     x2, x21
+        add     x0, x20, TETROMINO_STATE
+        add     x1, x20, BOARD_STATE
         bl      handle_a
 process_input__end_a:
 
         tst     x19, GPIO_S
         b.eq    process_input__end_s
-        mov     x1, x20
-        mov     x2, x21
+        add     x0, x20, TETROMINO_STATE
+        add     x1, x20, BOARD_STATE
         bl      handle_s
 process_input__end_s:
 
         tst     x19, GPIO_D
         b.eq    process_input__end_d
-        mov     x1, x20
-        mov     x2, x21
+        add     x0, x20, TETROMINO_STATE
+        add     x1, x20, BOARD_STATE
         bl      handle_d
 process_input__end_d:
 
         tst     x19, GPIO_SPACE
         b.eq    process_input__end_space
-        mov     x1, x20
-        mov     x2, x21
+        add     x0, x20, TETROMINO_STATE
         bl      handle_space
 process_input__end_space:
 
@@ -1041,9 +1039,8 @@ process_input__end_space:
 
 /*
  * Params:
- *      x0: u32 (on press flags)
- *      x1: mut struct TetrominoState*
- *	x2: in struct BoardState*
+ *      x0: mut struct TetrominoState*
+ *	x1: in struct BoardState*
  */
 handle_w:
         sub     sp, sp, 32
@@ -1052,24 +1049,20 @@ handle_w:
         stur    x20, [sp, 16]
         stur    x21, [sp, 24]
 
-        mov     x20, x1
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- board state
 
-        mov     x0, x1
-        mov     x1, x2
+        ldur    x9, [x20, TSTATE_ROT]
+        mov     x19, x9                 // x19 <- old rotation (in case new one fails)
+        add     x9, x9, 1
+        and     x9, x9, 0b11            // x9 = x9 mod 4
+        stur    x9, [x20, TSTATE_ROT]   // Save new rotation
 
-        ldur    x19, [x20, TSTATE_ROT]
-        mov     x21, x19
-        add     x19, x19, 1
-        cmp     x19, 4
-        b.ne    handle_w__rot_ok
-        mov     x19, 0
-handle_w__rot_ok:
-        stur    x19, [x20, TSTATE_ROT]
-
+        mov     x0, x20
+        mov     x1, x21
         bl      check_collision
         cbz     x0, handle_w__end
-
-        stur    x21, [x20, TSTATE_ROT]
+        stur    x19, [x20, TSTATE_ROT]  // New rotation failed collision, restore old rotation
 
 handle_w__end:
         ldur    lr, [sp]
@@ -1083,9 +1076,8 @@ handle_w__end:
 
 /*
  * Params:
- *      x0: u32 (on press flags)
- *      x1: mut struct TetrominoState*
- *	x2: in struct BoardState*
+ *      x0: mut struct TetrominoState*
+ *	x1: in struct BoardState*
  */
 handle_s:
         sub     sp, sp, 40
@@ -1095,27 +1087,22 @@ handle_s:
         stur    x21, [sp, 24]
         stur    x22, [sp, 32]
 
-        mov     x20, x1
-
-        mov     x0, x1
-        mov     x1, x2
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- board state
 
 handle_s__loop:
-        ldur    x19, [x20, TSTATE_POS_Y]
-        sub     x19, x19, 1
-        stur    x19, [x20, TSTATE_POS_Y]
+        ldur    x9, [x20, TSTATE_POS_Y]
+        sub     x9, x9, 1
+        stur    x9, [x20, TSTATE_POS_Y]
 
-        mov     x21, x0
-        mov     x22, x1
+        mov     x0, x20
+        mov     x1, x21
         bl      check_collision
-        mov     x2, x0
-        mov     x0, x21
-        mov     x1, x22
-        cbz     x2, handle_s__loop
+        cbz     x0, handle_s__loop
 
-        ldur    x19, [x20, TSTATE_POS_Y]
-        add     x19, x19, 1
-        stur    x19, [x20, TSTATE_POS_Y]
+        ldur    x9, [x20, TSTATE_POS_Y]
+        add     x9, x9, 1
+        stur    x9, [x20, TSTATE_POS_Y]
 
 handle_s__end:
         ldur    lr, [sp]
@@ -1130,9 +1117,8 @@ handle_s__end:
 
 /*
  * Params:
- *      x0: u32 (on press flags)
- *      x1: mut struct TetrominoState*
- *	x2: const struct BoardState*
+ *      x0: mut struct TetrominoState*
+ *	x1: const struct BoardState*
  */
 handle_a:
         sub     sp, sp, 24
@@ -1140,21 +1126,21 @@ handle_a:
         stur    x19, [sp, 8]
         stur    x20, [sp, 16]
 
-        mov     x20, x1
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- board state
 
-        mov     x0, x1
-        mov     x1, x2
+        ldur    x9, [x20, TSTATE_POS_X]
+        sub     x9, x9, 1
+        stur    x9, [x20, TSTATE_POS_X]
 
-        ldur    x19, [x20, TSTATE_POS_X]
-        sub     x19, x19, 1
-        stur    x19, [x20, TSTATE_POS_X]
-
+        mov     x0, x20
+        mov     x1, x21
         bl      check_collision
         cbz     x0, handle_a__end
 
-        ldur    x19, [x20, TSTATE_POS_X]
-        add     x19, x19, 1
-        stur    x19, [x20, TSTATE_POS_X]
+        ldur    x9, [x20, TSTATE_POS_X]
+        add     x9, x9, 1
+        stur    x9, [x20, TSTATE_POS_X]
 
 handle_a__end:
         ldur    lr, [sp]
@@ -1167,9 +1153,8 @@ handle_a__end:
 
 /*
  * Params:
- *      x0: u32 (on press flags)
- *      x1: mut struct TetrominoState*
- *	x2: const struct BoardState*
+ *      x0: mut struct TetrominoState*
+ *	x1: const struct BoardState*
  */
 handle_d:
         sub     sp, sp, 24
@@ -1177,21 +1162,21 @@ handle_d:
         stur    x19, [sp, 8]
         stur    x20, [sp, 16]
 
-        mov     x20, x1
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- board state
 
-        mov     x0, x1
-        mov     x1, x2
+        ldur    x9, [x20, TSTATE_POS_X]
+        add     x9, x9, 1
+        stur    x9, [x20, TSTATE_POS_X]
 
-        ldur    x19, [x20, TSTATE_POS_X]
-        add     x19, x19, 1
-        stur    x19, [x20, TSTATE_POS_X]
-
+        mov     x0, x20
+        mov     x1, x21
         bl      check_collision
         cbz     x0, handle_d__end
 
-        ldur    x19, [x20, TSTATE_POS_X]
-        sub     x19, x19, 1
-        stur    x19, [x20, TSTATE_POS_X]
+        ldur    x9, [x20, TSTATE_POS_X]
+        sub     x9, x9, 1
+        stur    x9, [x20, TSTATE_POS_X]
 
 handle_d__end:
         ldur    lr, [sp]
@@ -1204,13 +1189,12 @@ handle_d__end:
 
 /*
  * Params:
- *      x0: u32 (on press flags)
- *      x1: mut struct TetrominoState*
-*/
+ *      x0: mut struct TetrominoState*
+ */
 handle_space:
         stp     lr, x19, [sp, -16]!
 
-        sub     sp, x1, TETROMINO_STATE
+        sub     sp, x0, TETROMINO_STATE
         b       restart
 
 handle_space__end:
