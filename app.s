@@ -35,9 +35,9 @@
 
         .equ BACK_BUFFER_ADDRESS,       0x1000000
 
-	.equ GPIO_BASE,                 0x3f200000
-	.equ GPIO_GPFSEL0,              0x00
-	.equ GPIO_GPLEV0,               0x34
+        .equ GPIO_BASE,                 0x3f200000
+        .equ GPIO_GPFSEL0,              0x00
+        .equ GPIO_GPLEV0,               0x34
         .equ GPIO_W,                    0b000010        // (GPIO_1)
         .equ GPIO_A,                    0b000100        // (GPIO_2)
         .equ GPIO_S,                    0b001000        // (GPIO_3)
@@ -64,7 +64,7 @@
         BG_COLOR: .dword 0xFFFFFFFF
         PLAYER_COLOR: .dword 0xFFFFFFFF
 
-	.globl main
+        .globl main
 
 /* enum CollisionResult */
         .equ COLLISION_RESULT_NO_COLLISION,     0b00
@@ -179,12 +179,12 @@ main:
         // TODO: clean framebuffer saving
         str     x0, [sp]        // Save framebuffer to stack
 
-	// mov     x28, x0         // Save framebuffer address to x28
+        // mov     x28, x0         // Save framebuffer address to x28
         ldr     x28, =BACK_BUFFER_ADDRESS
 
-	// Set GPIOs 0..9 to read
-	mov     x9, GPIO_BASE
-	str     wzr, [x9, GPIO_GPFSEL0]
+        // Set GPIOs 0..9 to read
+        mov     x9, GPIO_BASE
+        str     wzr, [x9, GPIO_GPFSEL0]
 
         // Allocate and init struct GameState
         mov     x9, STRUCT_GAME_STATE_SIZE
@@ -988,8 +988,8 @@ read_input:
 
         ldr     w19, [x0, PRESSED_STATE]        // Load last pressed state to compute on press state
 
-	mov     x20, GPIO_BASE
-	ldr     w20, [x20, GPIO_GPLEV0]         // w20 = new pressed state
+        mov     x20, GPIO_BASE
+        ldr     w20, [x20, GPIO_GPLEV0]         // w20 = new pressed state
 
         // Input in bit 'n' is "on press" if current pressed state is 1 and previous pressed state is 0
         mvn     w19, w19                        // Bitwise NOT last pressed state
@@ -1540,7 +1540,7 @@ update_board__next_elem:
 
 update_board__row_complete:
         add     x6, x9, x10
-		add		x6, x6, BSTATE_DESTROYED_ROWS
+        add	x6, x6, BSTATE_DESTROYED_ROWS
         add     x7, x0, x10
         sturb   w7, [x6]
 
@@ -1694,10 +1694,10 @@ keepgoing:
         add     x15, x15, 1       // move on to the next square (-->)
 
         sub     x5, x5, x0
-        cmp     x5, BOARD_SIZE-1
+        cmp     x5, (BOARD_SIZE - 1)
         bne     keepgoing         // stop before reaching top line of grid (x15 at square #189, x5 at #199)
 
-        mov     x1, BOARD_HEIGHT - 1 
+        mov     x1, (BOARD_HEIGHT - 1)
         bl      erase_board_line   // Erase anything on top line
 
         ldur    lr, [sp]
