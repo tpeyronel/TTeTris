@@ -6,7 +6,7 @@ TETRIS_CELL_S:
         .include "./line.s"
 
         .equ TETRIS_CELL_SIZE,          21
-        .equ TETRIS_CELL_BORDER_SIZE,   4
+        .equ TETRIS_CELL_BORDER_SIZE,   5
 
 
 

@@ -218,18 +218,11 @@ game_loop:
         mov     x0, sp
         mov     x1, x28
         bl      tetromino_fall
-        cbz     x0, game_loop__keep_tetromino
-        /* We have just placed a tetromino, and we need to get a new one */
 
-
-        add     x0, sp, TETROMINO_STATE
-        bl      init_tetromino_state
-
-        add     x0, sp, CHOOSER_BAG_STATE
-        bl      choose_next_tetromino
-
-        sturb   w0, [sp, TETROMINO_STATE + TSTATE_ID]  // Start with new tetromino.
-game_loop__keep_tetromino:
+        cbnz    x0, game_loop__not_game_over
+        mov     x9, 1
+        str     x9, [sp, IS_PAUSED]
+game_loop__not_game_over:
 game_loop__dont_update:
 
         mov     x0, x28
@@ -286,12 +279,6 @@ game_loop__sleep:
         add     x0, x0, 1
         str     x0, [sp, TICK_COUNTER]
         b game_loop
-
-
-
-
-game_over:
-        b       game_over
 
 
 
@@ -1253,7 +1240,9 @@ restart_game:
 
 /*
  * Params:
- *      x0: struct GameState*   <- game state
+ *      x0: in/out struct GameState*    <- game state
+ * Returns:
+ *      x0: bool                        <- true if gravity was successful, false otherwise
  */
 tetromino_fall:
         sub sp, sp, 64
@@ -1273,7 +1262,7 @@ tetromino_fall:
 
         ldr     x9, =US_PER_AUTO_DROP
         cmp     x0, x9                  // Check time to see if tetromino should fall
-        b.lt    tetromino_fall__end
+        b.lt    tetromino_fall__success
 
         stur    w1, [x19, LAST_DROP]    // update LAST_DROP with LAST ATTEMPTED DROP time.
 
@@ -1291,13 +1280,17 @@ tetromino_fall:
         add     x0, x19, TETROMINO_STATE
         add     x1, x19, BOARD_STATE
         bl      try_drop_tetromino
+        cbnz    x0, tetromino_fall__success
 
-        cbnz    x0, tetromino_fall__end
+        /* Tetromino can't move down, we need to place it */
 
         // Try to integrate tetromino with board, if not possible, then GAME OVER.
         add     x0, x19, TETROMINO_STATE
         add     x1, x19, BOARD_STATE
         bl      try_place_tetromino
+        cbz     x0, tetromino_fall__failure
+
+        /* We successfully placed tetromino, so update the board and select a new one */
 
         // Check full lines and update board matrix.
         add     x0, x19, BOARD_STATE
@@ -1309,16 +1302,26 @@ tetromino_fall:
         add     x1, x0, x1                                   // Update completed rows
         stur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
 
-        mov x0, 1
-        b tetromino_fall__fullend
-        // Spawn new Tetromino at the top.
-        // TO-DO MARAS
+
+        add     x0, x19, TETROMINO_STATE
+        bl      init_tetromino_state                    // Put tetromino at starting position
+
+        add     x0, x19, CHOOSER_BAG_STATE
+        bl      choose_next_tetromino                   // Choose new tetromino
+        str     x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Save new tetromino.
+
+        b       tetromino_fall__success
+
+
+tetromino_fall__success:
+        mov     x0, 1
+        b       tetromino_fall__end
+
+tetromino_fall__failure:
+        mov     x0, 0
+        b       tetromino_fall__end
 
 tetromino_fall__end:
-        mov     x0, 0
-
-tetromino_fall__fullend:
-
         ldur    x25, [sp, 56]
         ldur    x24, [sp, 48]
         ldur    x23, [sp, 40]
@@ -1433,7 +1436,7 @@ try_place_tetromino:
         mov     x20, x1
 
         bl      check_collision
-        cbnz    x0, game_over  //??
+        cbnz    x0, try_place_tetromino__failure
 
         mov     x0, x21
         bl      get_tetromino
@@ -1475,15 +1478,22 @@ try_place_tetromino__next_cell:
         add     x4, x4, 1        // increase count per line.
 
         cmp     x0, x26
-        b.eq    try_place_tetromino__end  // If x0 reached the end, then game IS NOT over and BoardState IS Updated.
+        b.eq    try_place_tetromino__success  // If x0 reached the end, then game IS NOT over and BoardState IS Updated.
 
         cmp     x4, 4    // if tetromino matrix line is done, jump to next line.
         b.eq    try_place_tetromino__bigloop
 
         b       try_place_tetromino__loop
 
-try_place_tetromino__end:
+try_place_tetromino__success:
         mov     x0, 1
+        b       try_place_tetromino__end
+
+try_place_tetromino__failure:
+        mov     x0, 0
+        b       try_place_tetromino__end
+
+try_place_tetromino__end:
 
         ldur    x25, [sp, 56]
         ldur    x24, [sp, 48]
