@@ -190,10 +190,9 @@ main:
         // Allocate and init struct GameState
         mov     x9, STRUCT_GAME_STATE_SIZE
         sub     sp, sp, x9
-restart:
+
         mov     x0, sp
         bl      init_game_state
-
 
         add     x0, sp, PARTICLE_MANAGER
         bl      create_background_starfield
@@ -997,6 +996,9 @@ process_input:
         ldr     x19, [x0, INPUT_STATE + ON_PRESS_STATE] // x19 <- on press flags
         mov     x20, x0                                 // x20 <- in/out struct GameState*
 
+        ldr     x9, [x0, IS_PAUSED]
+        cbnz    x9, process_input__end_d
+
         tst     x19, GPIO_W
         b.eq    process_input__end_w
         add     x0, x20, TETROMINO_STATE
@@ -1027,7 +1029,8 @@ process_input__end_d:
 
         tst     x19, GPIO_SPACE
         b.eq    process_input__end_space
-        add     x0, x20, TETROMINO_STATE
+        add     x0, x20, IS_PAUSED
+        add     x1, x20, TETROMINO_STATE
         bl      handle_space
 process_input__end_space:
 
@@ -1189,13 +1192,16 @@ handle_d__end:
 
 /*
  * Params:
- *      x0: mut struct TetrominoState*
+ *      x0: in/out bool* (u64*)                 <- &is_paused
+ *      x1: in/out struct TetrominoState*       <- tetromino state
  */
 handle_space:
         stp     lr, x19, [sp, -16]!
 
-        sub     sp, x0, TETROMINO_STATE
-        b       restart
+        ldr     x9, [x0]
+        cmp     x9, 0
+        cset    x9, eq
+        str     x9, [x0]
 
 handle_space__end:
         ldp     lr, x19, [sp], 16
