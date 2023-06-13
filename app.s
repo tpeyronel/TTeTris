@@ -13,8 +13,8 @@
 
         .equ MOVEMENT_PER_STEP,         16
 
-        .equ BOARD_WIDTH,				10
-        .equ BOARD_HEIGHT,				20 
+        .equ BOARD_WIDTH,               10
+        .equ BOARD_HEIGHT,              20
         .equ BOARD_SIZE,                BOARD_WIDTH * BOARD_HEIGHT
         .equ BOARD_SIZE_IN_BYTES,       BOARD_SIZE * 1
 
@@ -72,11 +72,9 @@
         .equ COLLISION_RESULT_EXISTING_BLOCK,   0b10
 
 /* struct GameState */
-		.equ IS_PAUSED,					0												// Bool (u64)
-        .equ LAST_TICK,                 IS_PAUSED + 8                                   // u32
+        .equ LAST_TICK,                 0                                               // u32
         .equ LAST_DROP,                 LAST_TICK + 4                                   // u32
-        .equ TICK_COUNTER,              LAST_DROP + 4                                   // u64
-        .equ GAME_STATS,                TICK_COUNTER + 8                                // struct GameStats
+        .equ GAME_STATS,                LAST_DROP + 4                                   // struct GameStats
         .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE                     // struct InputState
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
         .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
@@ -232,17 +230,11 @@ game_loop:
         add     x0, sp, INPUT_STATE
         bl      read_input
 
-		/*
         add     x0, sp, INPUT_STATE
         add     x1, sp, TETROMINO_STATE
         add     x2, sp, BOARD_STATE
-		*/
-		mov		x0, sp
         bl      process_input
 
-		ldur	x0, [sp, IS_PAUSED]
-		cbnz	x0, game_loop__keep_tetromino
-	
         mov     x0, sp
         mov     x1, x28
         bl      tetromino_fall
@@ -309,10 +301,6 @@ game_loop__sleep:
         ldr     w0, [sp, LAST_TICK]
         add     w0, w0, w2
         str     w0, [sp, LAST_TICK]
-
-        ldr     x0, [sp, TICK_COUNTER]
-        add     x0, x0, 1
-        str     x0, [sp, TICK_COUNTER]
         b game_loop
 
 
@@ -329,46 +317,21 @@ game_over:
  *      x1: out u32*            <- dst framebuffer
  */
 copy_framebuffer:
-        stp     lr, x19, [sp, -80]!
-        stp     x20, x21, [sp, 16]
-        stp     x22, x23, [sp, 32]
-        stp     x24, x25, [sp, 48]
-        stp     x26, x27, [sp, 64]
+        stp     lr, x19, [sp, -16]!
 
         ldr     x19, =SCREEN_PIXELS     // x19 = width * height
-        lsl     x19, x19, BYTES_PER_PIXEL_SHIFT
-        add     x19, x0, x19
 
 copy_framebuffer__next_pixel:
-        ldp     x9, x10, [x0]
-        ldp     x11, x12, [x0, 16]
-        ldp     x13, x14, [x0, 32]
-        ldp     x15, x16, [x0, 48]
-        ldp     x20, x21, [x0, 64]
-        ldp     x22, x23, [x0, 80]
-        ldp     x24, x25, [x0, 96]
-        ldp     x26, x27, [x0, 112]
+        ldr     w9, [x0]
+        str     w9, [x1]
 
-        stp     x9, x10, [x1]
-        stp     x11, x12, [x1, 16]
-        stp     x13, x14, [x1, 32]
-        stp     x15, x16, [x1, 48]
-        stp     x20, x21, [x1, 64]
-        stp     x22, x23, [x1, 80]
-        stp     x24, x25, [x1, 96]
-        stp     x26, x27, [x1, 112]
-
-        add     x0, x0, 128
-        add     x1, x1, 128
-        cmp     x0, x19
-        b.lt    copy_framebuffer__next_pixel
+        add     x0, x0, BYTES_PER_PIXEL
+        add     x1, x1, BYTES_PER_PIXEL
+        subs    x19, x19, 1
+        b.gt    copy_framebuffer__next_pixel
 
 
-        ldp     x26, x27, [sp, 64]
-        ldp     x24, x25, [sp, 48]
-        ldp     x22, x23, [sp, 32]
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 80
+        ldp     lr, x19, [sp], 16
         ret
 
 
@@ -382,13 +345,9 @@ init_game_state:
 
         mov     x19, x0                 // x19 <- game_state
 
-		str		wzr, [x19, IS_PAUSED]
-
         bl      get_time
         str     w0, [x19, LAST_TICK]
         str     w0, [x19, LAST_DROP]
-
-        str     xzr, [x19, TICK_COUNTER]
 
         add     x0, x19, INPUT_STATE
         bl      init_input_state
@@ -886,7 +845,7 @@ draw_destroy_particles:
         mov     x24, x0
 
         add     x0, x0, LAST_DROP
-        ldur    w0, [x0]
+        ldur    x0, [x0]
         mov     x20, x0
 
         mov     x21, ( (SCREEN_WIDTH - BOARD_WIDTH * TETRIS_CELL_SIZE) / 2 )
@@ -1015,52 +974,33 @@ read_input:
 
 /*
  * Params:
- *      x0: mut struct GameState*
+ *      x0: const struct InputState*
+ *      x1: mut struct TetrominoState*
+ *      x2: const struct BoardState*      // Para chequear colision en los handle (MEJORARLO)
  */
 process_input:
-        stp     lr, x19, [sp, -48]!
+        stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
-		stp		x22, x23, [sp, 32]	
 
-        add		x19, x0, INPUT_STATE	   // x19 = const struct InputState*
-        add		x20, x0, TETROMINO_STATE   // x20 = mut struct TetrominoState*
-        add		x21, x0, BOARD_STATE	   // x21 = const struct BoardState*
-		add		x22, x0, IS_PAUSED		   // x22 = IS_PAUSED*
-
-		ldur	x3, [x22]
-		cbnz	x3, process_input__is_paused
+        mov     x19, x0         // x19 = const struct InputState*
+        mov     x20, x1         // x20 = mut struct TetrominoState*
+        mov 	x21, x2         // x21 = const struct BoardState*
 
         ldr     w0, [x19, ON_PRESS_STATE]
         mov     x1, x20
-		mov		x2, x21
+
         bl      handle_w
-
-        ldr     w0, [x19, ON_PRESS_STATE]
-        mov     x1, x20
-		mov		x2, x21
         bl      handle_a
-
-        ldr     w0, [x19, ON_PRESS_STATE]
-        mov     x1, x20
-		mov		x2, x21
         bl      handle_s
-
-        ldr     w0, [x19, ON_PRESS_STATE]
-        mov     x1, x20
-		mov		x2, x21
         bl      handle_d
-process_input__is_paused:	
-        ldr     w0, [x19, ON_PRESS_STATE]
-		mov		x1, x22
         bl      handle_space
 
         // mov     x0, x20
         // bl      clamp_player_coords
 
 
-        ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 48
+        ldp     lr, x19, [sp], 32
         ret
 
 
@@ -1243,7 +1183,7 @@ handle_d__end:
 /*
  * Params:
  *      x0: u32 (on press flags)
- *      x1: u64* (is_paused*)
+ *      x1: mut struct TetrominoState*
 */
 handle_space:
         stp     lr, x19, [sp, -16]!
@@ -1251,15 +1191,9 @@ handle_space:
         and     x19, x0, GPIO_SPACE
         cbz     x19, handle_space__end
 
-		ldur	x2, [x1]
-		cbz		x2, handle_space__pause	
+         sub     sp, x1, TETROMINO_STATE
+         b       restart
 
-		stur	xzr, [x1]
-		b handle_space__end
-
-handle_space__pause:	
-		mov		x2, 1
-		stur	x2, [x1]	
 handle_space__end:
         ldp     lr, x19, [sp], 16
         ret
@@ -1290,7 +1224,7 @@ tetromino_fall:
         cmp     x0, x9                  // Check time to see if tetromino should fall
         b.lt    tetromino_fall__end
 
-        stur    w1, [x19, LAST_DROP]    // update LAST_DROP with LAST ATTEMPTED DROP time.
+        stur    x1, [x19, LAST_DROP]    // update LAST_DROP with LAST ATTEMPTED DROP time.
 
         // am, destruir las partículas que haya
         sub     sp, sp, 16
@@ -1731,7 +1665,7 @@ keepgoing:
         cmp     x5, BOARD_SIZE-1
         bne     keepgoing         // stop before reaching top line of grid (x15 at square #189, x5 at #199)
 
-        mov     x1, BOARD_HEIGHT - 1
+        mov     x1, BOARD_HEIGHT - 1 
         bl      erase_board_line   // Erase anything on top line
 
         ldur    lr, [sp]
