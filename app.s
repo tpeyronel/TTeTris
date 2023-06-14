@@ -869,7 +869,7 @@ draw_destroy_particles__loop:
         mov     x0, x20
         bl      get_elapsed_time
         lsl     x0, x0, 5
-        ldr     w2, =US_PER_AUTO_DROP
+        ldr     x2, =US_PER_AUTO_DROP
         udiv    x4, x0, x2
         mov     x5, 1
         lsl     x5, x5, 5
@@ -1189,8 +1189,7 @@ handle_space:
         cbnz    x9, handle_space__restart_game
 
 handle_space__pause_game:
-        mov     x9, 1
-        str     x9, [x0, IS_PAUSED]
+        bl      do_hard_drop
         b       handle_space__end
 
 handle_space__restart_game:
@@ -1199,6 +1198,100 @@ handle_space__restart_game:
 
 handle_space__end:
         ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                                 <- new x pos
+ *      x1: u64                                 <- new y pos
+ *      x2: in/out struct TetrominoState*       <- tetromino state
+ *      x3: in struct BoardState*               <- board state
+ * Returns:
+ *      x0: bool                <- true if successful, false otherwise
+ */
+try_move_tetromino:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        mov     x20, x2         // x20 <- tetromino state
+        mov     x21, x3         // x21 <- board state
+
+        ldr     x22, [x20, TSTATE_POS_X]        // x22 <- old x pos
+        ldr     x23, [x20, TSTATE_POS_Y]        // x23 <- old y pos
+
+        // Set new positions
+        str     x0, [x20, TSTATE_POS_X]
+        str     x1, [x20, TSTATE_POS_Y]
+
+        mov     x0, x20
+        mov     x1, x21
+        bl      check_collision
+        cbz     x0, try_move_tetromino__success
+
+        /* Collision failed, revert to old positions */
+        str     x22, [x20, TSTATE_POS_X]
+        str     x23, [x20, TSTATE_POS_Y]
+
+        b try_move_tetromino__failure
+
+
+try_move_tetromino__success:
+        mov     x0, 1
+        b       try_move_tetromino__end
+
+try_move_tetromino__failure:
+        mov     x0, 0
+        b       try_move_tetromino__end
+
+try_move_tetromino__end:
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct GameState*
+ * Notes:
+ *      May cause game over if it can't spawn a new tetromino
+ */
+do_hard_drop:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x19, x0                 // x19 <- game state
+
+        ldr     x20, [x19, TETROMINO_STATE + TSTATE_POS_Y]      // x20 = tetromino y
+
+do_hard_drop__next_y:
+        ldr     x0, [x19, TETROMINO_STATE + TSTATE_POS_X]
+        mov     x1, x20
+        add     x2, x19, TETROMINO_STATE
+        add     x3, x19, BOARD_STATE
+        bl      try_move_tetromino
+        sub     x20, x20, 1
+        cbnz    x0, do_hard_drop__next_y        // If successful, try next y
+
+        /* Tetromino is at its lowest possible position, time to place it */
+
+        add     x0, x19, TETROMINO_STATE
+        add     x1, x19, BOARD_STATE
+        bl      try_place_tetromino_and_update
+        cbnz    x0, do_hard_drop__end
+
+        /* Failed to place the tetromino or couldn't successfully spawn another one, game over */
+
+        mov     x9, 1
+        str     x9, [x19, IS_PAUSED]
+
+do_hard_drop__end:
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
         ret
 
 
@@ -1510,6 +1603,55 @@ try_place_tetromino__end:
 
 /*
  * Params:
+ *      x0: in struct TetrominoState*
+ *      x1: in/out struct BoardState*
+ * Returns:
+ *      x0: bool
+ */
+try_place_tetromino_and_update:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- board state
+
+        mov     x0, x20
+        mov     x1, x21
+        bl      try_place_tetromino
+        cbz     x0, try_place_tetromino_and_update__end // Return 0 if try_place failed
+
+        /* We successfully placed tetromino, so update the board and spawn a new one */
+
+        add     x0, x19, BOARD_STATE
+        add     x1, x19, (TETROMINO_STATE + TSTATE_POS_Y)
+        ldur    x1, [x1]                                // x1 = posY of tetromino
+        bl      update_board
+
+        ldur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
+        add     x1, x0, x1                              // Update completed rows
+        stur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
+
+        add     x0, x19, TETROMINO_STATE
+        bl      init_tetromino_state                    // Put tetromino at starting position
+
+        bl      get_time
+        str     w0, [x19, LAST_DROP]                    // Set now as last drop
+
+        add     x0, x19, CHOOSER_BAG_STATE
+        bl      choose_next_tetromino                   // Choose new tetromino
+        str     x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Save new tetromino.
+
+        mov     x0, 1           // Return success
+
+try_place_tetromino_and_update__end:
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+
+/*
+ * Params:
  *      x0:	in/out struct BoardState*
  *      x1:	i64                             <- tetromino y position
  * Returns:
@@ -1744,6 +1886,9 @@ draw_circle_at:
         stp     x20, x21, [sp, 16]
         stp     x22, x23, [sp, 32]
 
+        cmp     x3, 0   // Early return if radius is non positive
+        b.le    draw_circle_at__end
+
         add     x19, x3, 1
         mul     x19, x3, x19     // x19 "=" r^2 === r*(r+1)
 
@@ -1787,7 +1932,7 @@ skip_circle_pixel:
         cmp     x21, x3
         b.le    circle_next_row
 
-
+draw_circle_at__end:
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 48
