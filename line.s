@@ -73,8 +73,6 @@ draw_vertical_line:
  *      x2: u64         <- length > 0
  *      w3: u32         <- argb color
  *      x4: out u32*    <- beginning of framebuffer
- * Comments:
- *      Draws a line from (x0, x1) to (x0, x1 + x2)
  */
 draw_right_diagonal_line:
         stp     lr, x19, [sp, -16]!
@@ -88,6 +86,30 @@ draw_right_diagonal_line:
 
         ldp     lr, x19, [sp], 16
         ret
+
+
+
+/*
+ * Params:
+ *      x0: u64         <- top left x coordinate           (left) 0 <= x < SCREEN_WIDTH (right)
+ *      x1: u64         <- top left y coordinate         (bottom) 0 <= y < SCREEN_HEIGHT (top)
+ *      x2: u64         <- length > 0
+ *      w3: u32         <- argb color
+ *      x4: out u32*    <- beginning of framebuffer
+ */
+draw_left_diagonal_line:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x5, x4
+        mov     w4, w3
+        mov     x3, x2
+        mov     x2, SCREEN_WIDTH + 1
+        lsl     x2, x2, BYTES_PER_PIXEL_SHIFT
+        bl      draw_line_by_offset
+
+        ldp     lr, x19, [sp], 16
+        ret
+
 
 
 /*

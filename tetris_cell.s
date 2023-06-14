@@ -154,7 +154,7 @@ draw_tetris_cell_by_colors:
         mov     x2, TETRIS_CELL_BORDER_SIZE
         mov     w3, w22                                 // w3 = diffuse color
         mov     x4, x25                                 // x4 = framebuffer
-        // bl      draw_right_diagonal_line
+        bl      draw_right_diagonal_line
 
         /* Draw top right diagonal line */
         add     x0, x20, TETRIS_CELL_SIZE - TETRIS_CELL_BORDER_SIZE
@@ -162,7 +162,23 @@ draw_tetris_cell_by_colors:
         mov     x2, TETRIS_CELL_BORDER_SIZE
         mov     w3, w22                                 // w3 = diffuse color
         mov     x4, x25                                 // x4 = framebuffer
-        // bl      draw_right_diagonal_line
+        bl      draw_right_diagonal_line
+
+        /* Draw top left diagonal line */
+        mov     x0, x20
+        add     x1, x21, (TETRIS_CELL_SIZE - 1)
+        mov     x2, TETRIS_CELL_BORDER_SIZE
+        mov     w3, w23                                 // w3 = specular color
+        mov     x4, x25                                 // x4 = framebuffer
+        bl      draw_left_diagonal_line
+
+        /* Draw bottom right diagonal line */
+        add     x0, x20, TETRIS_CELL_SIZE - TETRIS_CELL_BORDER_SIZE
+        add     x1, x21, TETRIS_CELL_BORDER_SIZE - 1
+        mov     x2, TETRIS_CELL_BORDER_SIZE
+        mov     w3, w24                                 // w3 = ambient color
+        mov     x4, x25                                 // x4 = framebuffer
+        bl      draw_left_diagonal_line
 
         ldp     x24, x25, [sp, 48]
         ldp     x22, x23, [sp, 32]
@@ -216,6 +232,12 @@ draw_tetris_cell_trapezoids:
         add     x25, x24, x9                    // x25 = top right of square
         add     x26, x25, x10                   // x26 = bottom right of square
         add     x27, x24, x10                   // x27 = bottom left of square
+
+        add     x24, x24, BYTES_PER_PIXEL
+        sub     x26, x26, BYTES_PER_PIXEL
+        add     x25, x25, SCREEN_WIDTH * BYTES_PER_PIXEL
+        sub     x27, x27, SCREEN_WIDTH * BYTES_PER_PIXEL
+
         /* End initialize framebuffer pointers */
 
         /*
@@ -227,7 +249,7 @@ draw_tetris_cell_trapezoids:
 
         mov     x20, 0                          // x iterator
         mov     x21, 0                          // y iterator
-        mov     x15, TETRIS_CELL_SIZE - 1       // x15 = current row size minus 1
+        mov     x15, TETRIS_CELL_SIZE - 2       // x15 = current row size
 
 draw_tetris_cell_trapezoids__next_row:
         cmp     x21, TETRIS_CELL_BORDER_SIZE
