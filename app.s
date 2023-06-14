@@ -1004,6 +1004,7 @@ process_input__end_a:
         b.eq    process_input__end_s
         add     x0, x20, TETROMINO_STATE
         add     x1, x20, BOARD_STATE
+        add     x2, x20, LAST_DROP
         bl      handle_s
 process_input__end_s:
 
@@ -1068,6 +1069,7 @@ handle_w__end:
  * Params:
  *      x0: mut struct TetrominoState*
  *	x1: in struct BoardState*
+ *      x2: out u32*                    <- last drop
  */
 handle_s:
         sub     sp, sp, 40
@@ -1079,20 +1081,19 @@ handle_s:
 
         mov     x20, x0         // x20 <- tetromino state
         mov     x21, x1         // x21 <- board state
+        mov     x22, x2         // x22 <- last drop
 
-handle_s__loop:
-        ldur    x9, [x20, TSTATE_POS_Y]
-        sub     x9, x9, 1
-        stur    x9, [x20, TSTATE_POS_Y]
+        ldr     x0, [x20, TSTATE_POS_X]
+        ldr     x1, [x20, TSTATE_POS_Y]
+        sub     x1, x1, 1
+        mov     x2, x20
+        mov     x3, x21
+        bl      try_move_tetromino
+        cbz     x0, handle_s__end
+        /* Successfully moved down */
 
-        mov     x0, x20
-        mov     x1, x21
-        bl      check_collision
-        cbz     x0, handle_s__loop
-
-        ldur    x9, [x20, TSTATE_POS_Y]
-        add     x9, x9, 1
-        stur    x9, [x20, TSTATE_POS_Y]
+        bl      get_time
+        str     w0, [x22]
 
 handle_s__end:
         ldur    lr, [sp]
@@ -1119,20 +1120,13 @@ handle_a:
         mov     x20, x0         // x20 <- tetromino state
         mov     x21, x1         // x21 <- board state
 
-        ldur    x9, [x20, TSTATE_POS_X]
-        sub     x9, x9, 1
-        stur    x9, [x20, TSTATE_POS_X]
+        ldr     x0, [x20, TSTATE_POS_X]
+        sub     x0, x0, 1
+        ldr     x1, [x20, TSTATE_POS_Y]
+        mov     x2, x20
+        mov     x3, x21
+        bl      try_move_tetromino
 
-        mov     x0, x20
-        mov     x1, x21
-        bl      check_collision
-        cbz     x0, handle_a__end
-
-        ldur    x9, [x20, TSTATE_POS_X]
-        add     x9, x9, 1
-        stur    x9, [x20, TSTATE_POS_X]
-
-handle_a__end:
         ldur    lr, [sp]
         ldur    x19, [sp, 8]
         ldur    x20, [sp, 16]
@@ -1155,20 +1149,13 @@ handle_d:
         mov     x20, x0         // x20 <- tetromino state
         mov     x21, x1         // x21 <- board state
 
-        ldur    x9, [x20, TSTATE_POS_X]
-        add     x9, x9, 1
-        stur    x9, [x20, TSTATE_POS_X]
+        ldr     x0, [x20, TSTATE_POS_X]
+        add     x0, x0, 1
+        ldr     x1, [x20, TSTATE_POS_Y]
+        mov     x2, x20
+        mov     x3, x21
+        bl      try_move_tetromino
 
-        mov     x0, x20
-        mov     x1, x21
-        bl      check_collision
-        cbz     x0, handle_d__end
-
-        ldur    x9, [x20, TSTATE_POS_X]
-        sub     x9, x9, 1
-        stur    x9, [x20, TSTATE_POS_X]
-
-handle_d__end:
         ldur    lr, [sp]
         ldur    x19, [sp, 8]
         ldur    x20, [sp, 16]
@@ -1380,38 +1367,11 @@ tetromino_fall:
         // Try to integrate tetromino with board, if not possible, then GAME OVER.
         add     x0, x19, TETROMINO_STATE
         add     x1, x19, BOARD_STATE
-        bl      try_place_tetromino
-        cbz     x0, tetromino_fall__failure
-
-        /* We successfully placed tetromino, so update the board and select a new one */
-
-        // Check full lines and update board matrix.
-        add     x0, x19, BOARD_STATE
-        add     x1, x19, (TETROMINO_STATE + TSTATE_POS_Y)
-        ldur    x1, [x1]                                  // x1 = posY of tetromino
-        bl      update_board
-
-        ldur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
-        add     x1, x0, x1                                   // Update completed rows
-        stur    x1, [x19, GAME_STATS + GS_COMPLETED_ROWS]
-
-
-        add     x0, x19, TETROMINO_STATE
-        bl      init_tetromino_state                    // Put tetromino at starting position
-
-        add     x0, x19, CHOOSER_BAG_STATE
-        bl      choose_next_tetromino                   // Choose new tetromino
-        str     x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Save new tetromino.
-
-        b       tetromino_fall__success
-
+        bl      try_place_tetromino_and_update
+        b       tetromino_fall__end     // Return result of call above
 
 tetromino_fall__success:
         mov     x0, 1
-        b       tetromino_fall__end
-
-tetromino_fall__failure:
-        mov     x0, 0
         b       tetromino_fall__end
 
 tetromino_fall__end:
