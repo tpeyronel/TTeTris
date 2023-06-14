@@ -151,20 +151,18 @@ draw_tetris_cell_by_colors:
         /* Draw bottom left diagonal line */
         mov     x0, x20
         mov     x1, x21
-        add     x2, x0, TETRIS_CELL_BORDER_SIZE - 1
-        add     x3, x1, TETRIS_CELL_BORDER_SIZE - 1
+        mov     x2, TETRIS_CELL_BORDER_SIZE
+        mov     w3, w22                                 // w3 = diffuse color
         mov     x4, x25                                 // x4 = framebuffer
-        mov     w5, w22                                 // w5 = diffuse color
-        bl      draw_line
+        // bl      draw_right_diagonal_line
 
         /* Draw top right diagonal line */
-        add     x0, x20, TETRIS_CELL_SIZE - 1
-        add     x1, x21, TETRIS_CELL_SIZE - 1
-        sub     x2, x0, TETRIS_CELL_BORDER_SIZE - 1
-        sub     x3, x1, TETRIS_CELL_BORDER_SIZE - 1
+        add     x0, x20, TETRIS_CELL_SIZE - TETRIS_CELL_BORDER_SIZE
+        add     x1, x21, TETRIS_CELL_SIZE - TETRIS_CELL_BORDER_SIZE
+        mov     x2, TETRIS_CELL_BORDER_SIZE
+        mov     w3, w22                                 // w3 = diffuse color
         mov     x4, x25                                 // x4 = framebuffer
-        mov     w5, w22                                 // w5 = diffuse color
-        bl      draw_line
+        // bl      draw_right_diagonal_line
 
         ldp     x24, x25, [sp, 48]
         ldp     x22, x23, [sp, 32]
@@ -215,9 +213,9 @@ draw_tetris_cell_trapezoids:
         lsl     x9, x9, BYTES_PER_PIXEL_SHIFT   // x9 = space in bytes between horizontal corners
         lsl     x10, x10, BYTES_PER_PIXEL_SHIFT // x10 = space in bytes between vertical corners
 
-        add     x25, x24, x10                   // x25 = bottom left of square
-        mov     x26, x24                        // x26 = top left of square
-        add     x27, x24, x9                    // x27 = top right of square
+        add     x25, x24, x9                    // x25 = top right of square
+        add     x26, x25, x10                   // x26 = bottom right of square
+        add     x27, x24, x10                   // x27 = bottom left of square
         /* End initialize framebuffer pointers */
 
         /*
@@ -229,7 +227,7 @@ draw_tetris_cell_trapezoids:
 
         mov     x20, 0                          // x iterator
         mov     x21, 0                          // y iterator
-        mov     x15, TETRIS_CELL_SIZE           // x15 = current row size
+        mov     x15, TETRIS_CELL_SIZE - 1       // x15 = current row size minus 1
 
 draw_tetris_cell_trapezoids__next_row:
         cmp     x21, TETRIS_CELL_BORDER_SIZE
@@ -240,20 +238,30 @@ draw_tetris_cell_trapezoids__next_col:
         b.ge    draw_tetris_cell_trapezoids__end_row
 
         /* Draw pixels */
-        str     w22, [x24]
-        str     w23, [x25]
-        str     w22, [x26]
-        str     w23, [x27]
+        str     x15, [sp, -8]!
+        mov     w0, w22
+        mov     x1, x24
+        bl      draw_argb_pixel
+        mov     w0, w23
+        mov     x1, x25
+        bl      draw_argb_pixel
+        mov     w0, w23
+        mov     x1, x26
+        bl      draw_argb_pixel
+        mov     w0, w22
+        mov     x1, x27
+        bl      draw_argb_pixel
+        ldr     x15, [sp], 8
 
         /* Advance pointers */
         // Advance horizontally
         add     x24, x24, BYTES_PER_PIXEL
-        add     x25, x25, BYTES_PER_PIXEL
+        sub     x26, x26, BYTES_PER_PIXEL
         // Advance vertically
         mov     x9, SCREEN_WIDTH
         lsl     x9, x9, BYTES_PER_PIXEL_SHIFT
-        add     x26, x26, x9
-        add     x27, x27, x9
+        add     x25, x25, x9
+        sub     x27, x27, x9
 
         add     x20, x20, 1     // Increment x iterator
         b       draw_tetris_cell_trapezoids__next_col
@@ -266,21 +274,17 @@ draw_tetris_cell_trapezoids__end_row:
         // to the beginning of the next row (above or below), offseted by one pixel to the right
         neg     x10, x15
         add     x10, x10, 1
-        lsl     x10, x10, BYTES_PER_PIXEL_SHIFT
+        lsl     x10, x10, BYTES_PER_PIXEL_SHIFT         // x10 <- horizontal offset to move back except 1
 
         mov     x11, SCREEN_WIDTH
-        lsl     x11, x11, BYTES_PER_PIXEL_SHIFT
+        lsl     x11, x11, BYTES_PER_PIXEL_SHIFT         // x11 <- vertical offset to next row
 
-        add     x9, x10, x11
+        add     x9, x10, x11            // x9 <- vertically down by one and horizontally left by row size
         add     x24, x24, x9
-
-        sub     x9, x10, x11
-        add     x25, x25, x9
+        sub     x26, x26, x9
 
 
-        /* Advance pointers to vertical trapezoids */
-        // We need to move the pointers that are currently at the bottom of a column,
-        // to the beginning of the next column (left or right), offseted by one row down
+        /* Advance pointers of vertical trapezoids */
         mov     x10, SCREEN_WIDTH
         mul     x10, x10, x15
         neg     x10, x10
@@ -288,11 +292,9 @@ draw_tetris_cell_trapezoids__end_row:
         lsl     x10, x10, BYTES_PER_PIXEL_SHIFT
         // x10 now moves a pointer to the second element of the current column (which has the same height as the first element of the next column)
 
-        add     x9, x10, BYTES_PER_PIXEL        // x9 now moves to the beginning of the column on the right
-        add     x26, x26, x9
-
-        sub     x9, x10, BYTES_PER_PIXEL        // x9 now moves to the beginning of the column on the left
-        add     x27, x27, x9
+        sub     x9, x10, BYTES_PER_PIXEL        // x9 <- vertically up by row size and horizontally left by one
+        add     x25, x25, x9
+        sub     x27, x27, x9
 
 
         sub     x15, x15, 2             // Row size is decremented by 2
