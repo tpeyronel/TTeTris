@@ -242,6 +242,20 @@ game_loop__dont_update:
         mov     x4, x28
         bl      draw_board
 
+        mov     x0, 64
+        mov     x1, 64
+        ldr     w2, =0x7FDDDDDD
+        ldr     w3, =0x7FFFFFFF
+        ldr     w4, =0x7F999999
+        ldr     x9, [sp, TETROMINO_STATE + TSTATE_ID]
+        mov     x10, STRUCT_TETROMINO_SIZE
+        mul     x9, x9, x10
+        add     x9, x9, TETROMINO_ROTS
+        ldr     x10, =TETROMINOS
+        add     x5, x9, x10
+        mov     x6, x28
+        bl      draw_tetromino_by_colors_at
+
 
         mov     x0, (SCREEN_WIDTH - 1)
         sub     x0, x0, x19

@@ -10,6 +10,73 @@ TETRIS_CELL_S:
 
 
 
+
+/*
+ * Params:
+ *      x0: u64                         <- bottom left x
+ *      x1: u64                         <- bottom left y
+ *      w2: u32                         <- diffuse color
+ *      w3: u32                         <- specular color
+ *      w4: u32                         <- ambient color
+ *      x5: in struct TetrominoData*    <- tetromino data
+ *      x6: in/out u32*                 <- framebuffer
+ */
+draw_tetromino_by_colors_at:
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+        stp     x26, x27, [sp, 64]
+
+        mov     x20, x0         //   mut x20 <- x coordinate iterator
+        mov     x21, x1         //   mut x21 <- y coordinate iterator
+        mov     w22, w2         // const w22 <- diffuse color
+        mov     w23, w3         // const w23 <- specular color
+        mov     w24, w4         // const w24 <- ambient color
+        mov     x25, x5         //   mut x25 <- tetromino data iterator
+        mov     x19, x6         // const x19 <- framebuffer
+
+        mov     x27, 0          // mut x27 <- row iterator
+draw_tetromino_by_colors_at__next_row:
+
+        mov     x26, 0          // mut x26 <- col iterator
+draw_tetromino_by_colors_at__next_col:
+        ldrb    w9, [x25]
+        cbz     w9, draw_tetromino_by_colors_at__skip_cell
+
+        mov     x0, x20
+        mov     x1, x21
+        mov     w2, w22
+        mov     w3, w23
+        mov     w4, w24
+        mov     x5, x19         // x5 <- framebuffer
+        bl      draw_tetris_cell_by_colors
+
+draw_tetromino_by_colors_at__skip_cell:
+        add     x20, x20, TETRIS_CELL_SIZE      // Advance x iterator by tetris cell size
+        add     x25, x25, 1                     // Advance tetromino data to next cell
+        add     x26, x26, 1
+        cmp     x26, TETROMINO_BOARD_WIDTH
+        b.lt    draw_tetromino_by_colors_at__next_col
+
+        sub     x20, x20, (TETRIS_CELL_SIZE * TETROMINO_BOARD_WIDTH)
+        add     x21, x21, TETRIS_CELL_SIZE
+        mov     x26, 0
+        add     x27, x27, 1
+        cmp     x27, TETROMINO_BOARD_HEIGHT
+        b.lt    draw_tetromino_by_colors_at__next_row
+
+
+
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
+        ret
+
+
+
 /*
  * Params:
  *      x0: u64                 <- bottom left x position (game coordinates)
