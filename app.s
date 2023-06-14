@@ -244,9 +244,9 @@ game_loop__dont_update:
 
         mov     x0, 64
         mov     x1, 64
-        ldr     w2, =0x7FDDDDDD
-        ldr     w3, =0x7FFFFFFF
-        ldr     w4, =0x7F999999
+        ldr     w2, =0x3FDDDDDD
+        ldr     w3, =0x3FFFFFFF
+        ldr     w4, =0x3F999999
         ldr     x9, [sp, TETROMINO_STATE + TSTATE_ID]
         mov     x10, STRUCT_TETROMINO_SIZE
         mul     x9, x9, x10
