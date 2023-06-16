@@ -557,6 +557,7 @@ draw_board_inner:
 
 
 
+
         mov     x26, 0          // x26 <- row iterator
 
 draw_board_inner__next_row:
@@ -567,21 +568,21 @@ draw_board_inner__next_col:
         mov     x1, x26
         mov     x2, x23
         bl      get_tetromino_cell_at
-        mov     x1, 0
+        mov     x19, 0
         cbnz    x0, draw_board_inner__draw_cell
 
         mov     x0, x25
         mov     x1, x26
         mov     x2, x27
         bl      get_tetromino_cell_at
-        mov     x1, 1
+        mov     x19, 1
         cbnz    x0, draw_board_inner__draw_cell
 
         mov     x0, x25
         mov     x1, x26
         mov     x2, x22
         bl      get_board_cell_at
-        mov     x1, 0
+        mov     x19, 0
         cbnz    x0, draw_board_inner__draw_cell
 
         b       draw_board_inner__skip_cell
@@ -1351,16 +1352,9 @@ do_hard_drop:
 
         mov     x19, x0                 // x19 <- game state
 
-        ldr     x20, [x19, TETROMINO_STATE + TSTATE_POS_Y]      // x20 = tetromino y
-
-do_hard_drop__next_y:
-        ldr     x0, [x19, TETROMINO_STATE + TSTATE_POS_X]
-        mov     x1, x20
-        add     x2, x19, TETROMINO_STATE
-        add     x3, x19, BOARD_STATE
-        bl      try_move_tetromino
-        sub     x20, x20, 1
-        cbnz    x0, do_hard_drop__next_y        // If successful, try next y
+        add     x0, x19, TETROMINO_STATE
+        add     x1, x19, BOARD_STATE
+        bl      move_tetromino_to_bottom
 
         /* Tetromino is at its lowest possible position, time to place it */
 
@@ -1377,6 +1371,38 @@ do_hard_drop__next_y:
 do_hard_drop__end:
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct TetrominoState*
+ *      x1: in struct BoardState*
+ */
+move_tetromino_to_bottom:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        mov     x20, x0                 // x20 <- tetromino state
+        mov     x21, x1                 // x21 <- board state
+
+        ldr     x22, [x20, TSTATE_POS_X]      // const x22 = tetromino x
+        ldr     x23, [x20, TSTATE_POS_Y]      // x23 = tetromino y
+
+move_tetromino_to_bottom__next_y:
+        mov     x0, x22
+        mov     x1, x23
+        mov     x2, x20
+        mov     x3, x21
+        bl      try_move_tetromino
+        sub     x23, x23, 1                             // Decrement y
+        cbnz    x0, move_tetromino_to_bottom__next_y    // If successful, try next y
+
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
         ret
 
 
