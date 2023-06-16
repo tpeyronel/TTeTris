@@ -13,11 +13,6 @@
 
         .equ MOVEMENT_PER_STEP,         16
 
-        .equ BOARD_WIDTH,               10
-        .equ BOARD_HEIGHT,              20
-        .equ BOARD_SIZE,                BOARD_WIDTH * BOARD_HEIGHT
-        .equ BOARD_SIZE_IN_BYTES,       BOARD_SIZE * 1
-
         .equ TETROMINO_ID_BIAS,         1
 
         .equ TEST_BINARY_TO_DECIMAL_MAX,        10000
@@ -76,7 +71,9 @@
         .equ LAST_TICK,                 IS_PAUSED + 8                                   // u32
         .equ LAST_DROP,                 LAST_TICK + 4                                   // u32
         .equ TICK_COUNTER,              LAST_DROP + 4                                   // u64
-        .equ GAME_STATS,                TICK_COUNTER + 8                                // struct GameStats
+        .equ HELD_PIECE_ID,             TICK_COUNTER + 8                                // u64 <- 0 or tetromino id with bias
+        .equ CONSUMED_SWAP,             HELD_PIECE_ID + 8                               // bool (u64)
+        .equ GAME_STATS,                CONSUMED_SWAP + 8                               // struct GameStats
         .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE                     // struct InputState
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
         .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
@@ -362,6 +359,8 @@ init_game_state:
         str     w0, [x19, LAST_DROP]
 
         str     xzr, [x19, TICK_COUNTER]
+        str     xzr, [x19, HELD_PIECE_ID]
+        str     xzr, [x19, CONSUMED_SWAP]
 
         add     x0, x19, INPUT_STATE
         bl      init_input_state
@@ -1106,9 +1105,7 @@ process_input__end_a:
 
         tst     x19, GPIO_S
         b.eq    process_input__end_s
-        add     x0, x20, TETROMINO_STATE
-        add     x1, x20, BOARD_STATE
-        add     x2, x20, LAST_DROP
+        mov     x0, x20
         bl      handle_s
 process_input__end_s:
 
@@ -1171,9 +1168,7 @@ handle_w__end:
 
 /*
  * Params:
- *      x0: mut struct TetrominoState*
- *	x1: in struct BoardState*
- *      x2: out u32*                    <- last drop
+ *      x0: in/out struct GameState*
  */
 handle_s:
         sub     sp, sp, 40
@@ -1183,21 +1178,48 @@ handle_s:
         stur    x21, [sp, 24]
         stur    x22, [sp, 32]
 
-        mov     x20, x0         // x20 <- tetromino state
-        mov     x21, x1         // x21 <- board state
-        mov     x22, x2         // x22 <- last drop
+        mov     x19, x0         // x19 <- game state
 
-        ldr     x0, [x20, TSTATE_POS_X]
-        ldr     x1, [x20, TSTATE_POS_Y]
-        sub     x1, x1, 1
-        mov     x2, x20
-        mov     x3, x21
-        bl      try_move_tetromino
-        cbz     x0, handle_s__end
-        /* Successfully moved down */
+        ldr     x9, [x19, CONSUMED_SWAP]
+        cbnz    x9, handle_s__end
+
+        mov     x9, 1
+        str     x9, [x19, CONSUMED_SWAP]
+
+        ldr     x9, [x19, HELD_PIECE_ID]
+
+        /* Choose new tetromino if no piece is currently held */
+        cbnz    x9, handle_s__swap
+        add     x0, x19, CHOOSER_BAG_STATE
+        bl      choose_next_tetromino
+        add     x9, x0, TETROMINO_ID_BIAS
+handle_s__swap:
+
+        ldr     x10, [x19, TETROMINO_STATE + TSTATE_ID]
+
+        sub     x9, x9, TETROMINO_ID_BIAS
+        add     x10, x10, TETROMINO_ID_BIAS
+
+        str     x9, [x19, TETROMINO_STATE + TSTATE_ID]
+        str     x10, [x19, HELD_PIECE_ID]
 
         bl      get_time
-        str     w0, [x22]
+        str     w0, [x19, LAST_DROP]
+
+        str     xzr, [x19, TETROMINO_STATE + TSTATE_ROT]
+
+        mov     x0, TETROMINO_ORIGIN_X
+        str     x0, [x19, TETROMINO_STATE + TSTATE_POS_X]
+        mov     x1, TETROMINO_ORIGIN_Y
+        str     x1, [x19, TETROMINO_STATE + TSTATE_POS_Y]
+        add     x2, x19, TETROMINO_STATE
+        add     x3, x19, BOARD_STATE
+        bl      try_move_tetromino
+        cbnz    x0, handle_s__end
+        /* Failed to position new piece at the top, game over */
+
+        mov     x9, 1
+        str     x9, [x19, IS_PAUSED]
 
 handle_s__end:
         ldur    lr, [sp]
@@ -1425,6 +1447,9 @@ restart_game:
 
         bl      get_time
         str     w0, [x19, LAST_DROP]
+
+        str     xzr, [x19, HELD_PIECE_ID]
+        str     xzr, [x19, CONSUMED_SWAP]
 
         add     x0, x19, TETROMINO_STATE
         bl      init_tetromino_state
@@ -1729,6 +1754,8 @@ try_place_tetromino_and_update:
         add     x0, x19, CHOOSER_BAG_STATE
         bl      choose_next_tetromino                   // Choose new tetromino
         str     x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Save new tetromino.
+
+        str     xzr, [x19, CONSUMED_SWAP]               // Reset consumed_swap flag
 
         mov     x0, 1           // Return success
 

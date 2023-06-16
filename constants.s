@@ -12,6 +12,11 @@ CONSTANTS_S:
         .equ BYTES_PER_TETROMINO_BLOCK,         1
         .equ BYTES_PER_TETROMINO_BLOCK_SHIFT,   0
 
+        .equ BOARD_WIDTH,               10
+        .equ BOARD_HEIGHT,              20
+        .equ BOARD_SIZE,                BOARD_WIDTH * BOARD_HEIGHT
+        .equ BOARD_SIZE_IN_BYTES,       BOARD_SIZE * 1
+
         .equ TETROMINO_BOARD_WIDTH,             4
         .equ TETROMINO_BOARD_HEIGHT,            4
         .equ TETROMINO_BOARD_SIZE,              TETROMINO_BOARD_WIDTH * TETROMINO_BOARD_WIDTH
@@ -19,6 +24,9 @@ CONSTANTS_S:
         .equ NUM_ORIENTATIONS,                  4
 
         .equ NUM_TETROMINOS,                    7
+
+        .equ TETROMINO_ORIGIN_X,                (BOARD_WIDTH / 2) - (TETROMINO_BOARD_WIDTH / 2)
+        .equ TETROMINO_ORIGIN_Y,                BOARD_HEIGHT - TETROMINO_BOARD_HEIGHT
 
 
 /* struct Tetromino */
