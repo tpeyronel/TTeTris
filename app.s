@@ -543,6 +543,19 @@ draw_board_inner:
         mov     x23, x3         // x23 <- tetromino state
         mov     x24, x4         // x24 <- framebuffer
 
+        // Copy tetromino state
+        sub     sp, sp, STRUCT_TSTATE_SIZE
+        mov     x27, sp
+        ldr     x9, [x23, TSTATE_ID]
+        str     x9, [x27, TSTATE_ID]
+        ldr     x9, [x23, TSTATE_ROT]
+        str     x9, [x27, TSTATE_ROT]
+        ldr     x9, [x23, TSTATE_POS_X]
+        str     x9, [x27, TSTATE_POS_X]
+        ldr     x9, [x23, TSTATE_POS_Y]
+        str     x9, [x27, TSTATE_POS_Y]
+
+
 
         mov     x26, 0          // x26 <- row iterator
 
@@ -552,12 +565,29 @@ draw_board_inner__next_row:
 draw_board_inner__next_col:
         mov     x0, x25
         mov     x1, x26
-        mov     x2, x22
-        mov     x3, x23
-        bl      get_cell_id_with_tetromino_at
-        cbz     x0, draw_board_inner__skip_cell       // skip if cell is air
-        sub     x0, x0, TETROMINO_ID_BIAS       // x0 <- normalized cell id
+        mov     x2, x23
+        bl      get_tetromino_cell_at
+        mov     x1, 0
+        cbnz    x0, draw_board_inner__draw_cell
 
+        mov     x0, x25
+        mov     x1, x26
+        mov     x2, x27
+        bl      get_tetromino_cell_at
+        mov     x1, 1
+        cbnz    x0, draw_board_inner__draw_cell
+
+        mov     x0, x25
+        mov     x1, x26
+        mov     x2, x22
+        bl      get_board_cell_at
+        mov     x1, 0
+        cbnz    x0, draw_board_inner__draw_cell
+
+        b       draw_board_inner__skip_cell
+
+draw_board_inner__draw_cell:
+        sub     x0, x0, TETROMINO_ID_BIAS       // x0 <- normalized cell id
         bl      get_tetromino_by_index
         mov     x2, x0                          // x2: in struct Tetromino* <- current tetromino
 
@@ -580,6 +610,7 @@ draw_board_inner__skip_cell:
         b.lt    draw_board_inner__next_row
         /* We finished drawing inner board */
 
+        add     sp, sp, STRUCT_TSTATE_SIZE
 
         ldp     x26, x27, [sp, 64]
         ldp     x24, x25, [sp, 48]
@@ -722,6 +753,29 @@ get_cell_id_with_tetromino_at__end:
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 80
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- x coordinate 0 <= x < BOARD_WIDTH
+ *      x1: u64                         <- y coordinate 0 <= y < BOARD_HEIGHT
+ *      x2: in struct BoardState*       <- board state
+ * Returns:
+ *      x0: u64                         <- 0 or tetromino id + TETROMINO_ID_BIAS
+ */
+get_board_cell_at:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x9, BOARD_WIDTH
+        mul     x9, x9, x1
+        add     x9, x9, x0
+        add     x9, x9, BSTATE_BOARD
+        add     x9, x2, x9
+        ldrb    w0, [x9]
+
+        ldp     lr, x19, [sp], 16
         ret
 
 
