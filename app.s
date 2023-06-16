@@ -697,39 +697,15 @@ get_cell_id_with_tetromino_at:
         mov     x22, x2                 // x22 <- board state
         mov     x23, x3                 // x23 <- tetromino state
 
-        ldr     x24, [x3, TSTATE_POS_X] // x24 <- tetromino x
-        ldr     x25, [x3, TSTATE_POS_Y] // x25 <- tetromino y
 
-        sub     x24, x0, x24            // x24 <- tetromino x relative to cell x
-        cmp     x24, 0
-        b.lt    get_cell_id_with_tetromino_at__not_tetromino
-        cmp     x24, TETROMINO_BOARD_WIDTH
-        b.ge    get_cell_id_with_tetromino_at__not_tetromino
+        mov     x0, x20
+        mov     x1, x21
+        mov     x2, x23
+        bl      get_tetromino_cell_at
+        cbnz    x0, get_cell_id_with_tetromino_at__end
 
-        sub     x25, x1, x25            // x25 <- tetromino y relative to cell y
-        cmp     x25, 0
-        b.lt    get_cell_id_with_tetromino_at__not_tetromino
-        cmp     x25, TETROMINO_BOARD_HEIGHT
-        b.ge    get_cell_id_with_tetromino_at__not_tetromino
+        /* Current cell is not tetromino, check board */
 
-        /* Current cell is inside tetromino matrix, we should check that first */
-
-        mov     x0, x3
-        bl      get_tetromino           // x0 <- tetromino data of current tetromino's rotation
-
-        mov     x2, x0                  // x2 <- current tetromino data
-        mov     x0, x24                 // x0 <- tetromino x in tetromino board
-        mov     x1, x25                 // x1 <- tetromino y in tetromino board
-        bl      is_tetromino_cell_air
-        cbnz    x0, get_cell_id_with_tetromino_at__not_tetromino
-
-        /* Current cell belongs to tetromino */
-        ldr     x0, [x23, TSTATE_ID]            // x0 <- cell id without bias
-        add     x0, x0, TETROMINO_ID_BIAS       // x0 <- cell id with bias
-        b       get_cell_id_with_tetromino_at__end
-
-
-get_cell_id_with_tetromino_at__not_tetromino:
         mov     x9, BOARD_WIDTH
         mul     x9, x21, x9
         add     x9, x9, x20
@@ -746,6 +722,60 @@ get_cell_id_with_tetromino_at__end:
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 80
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: i64                         <- x coordinate
+ *      x1: i64                         <- y coordinate
+ *      x2: in struct TetrominoState*   <- tetromino state
+ * Returns:
+ *      x0: u64                         <- 0 or tetromino id + TETROMINO_ID_BIAS
+ */
+get_tetromino_cell_at:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x19, x2
+
+        ldr     x20, [x19, TSTATE_POS_X] // x20 <- global tetromino x
+        ldr     x21, [x19, TSTATE_POS_Y] // x21 <- global tetromino y
+
+        sub     x20, x0, x20    // x20 <- local tetromino x
+        sub     x21, x1, x21    // x21 <- local tetromino y
+
+        // Check that 0 <= x < TETROMINO_BOARD_WIDTH
+        cmp     x20, TETROMINO_BOARD_WIDTH
+        b.hs    get_tetromino_cell_at__air
+
+        // Check that 0 <= y < TETROMINO_BOARD_HEIGHT
+        cmp     x21, TETROMINO_BOARD_HEIGHT
+        b.hs    get_tetromino_cell_at__air
+
+        /* (x, y) is inside tetromino matrix */
+
+        mov     x0, x19
+        bl      get_tetromino
+
+        mov     x9, TETROMINO_BOARD_WIDTH
+        mul     x9, x9, x21
+        add     x9, x9, x20
+        add     x9, x0, x9
+        ldrb    w9, [x9]
+        cbz     x9, get_tetromino_cell_at__air
+
+        ldr     x0, [x19, TSTATE_ID]
+        add     x0, x0, TETROMINO_ID_BIAS
+        b       get_tetromino_cell_at__end
+
+get_tetromino_cell_at__air:
+        mov     x0, 0
+
+get_tetromino_cell_at__end:
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
         ret
 
 
