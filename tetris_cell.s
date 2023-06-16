@@ -15,6 +15,35 @@ TETRIS_CELL_S:
  * Params:
  *      x0: u64                         <- bottom left x
  *      x1: u64                         <- bottom left y
+ *      x2: u64                         <- tetromino id
+ *      x3: in/out u32*                 <- framebuffer
+ */
+draw_tetromino_at:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x9, STRUCT_TETROMINO_SIZE
+        mul     x9, x2, x9
+        ldr     x10, =TETROMINOS
+        add     x9, x9, x10
+
+        mov     x6, x3
+        mov     x0, x0
+        mov     x1, x1
+        ldr     w2, [x9, TETROMINO_DIFFUSE_COLOR]
+        ldr     w3, [x9, TETROMINO_SPECULAR_COLOR]
+        ldr     w4, [x9, TETROMINO_AMBIENT_COLOR]
+        add     x5, x9, TETROMINO_ROTS  // Draw first rotation
+        bl      draw_tetromino_by_colors_at
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- bottom left x
+ *      x1: u64                         <- bottom left y
  *      w2: u32                         <- diffuse color
  *      w3: u32                         <- specular color
  *      w4: u32                         <- ambient color
