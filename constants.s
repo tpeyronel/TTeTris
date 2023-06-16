@@ -40,6 +40,8 @@ CONSTANTS_S:
         .equ FRAME_SPECULAR_COLOR,      0xFF999999
         .equ FRAME_AMBIENT_COLOR,       0xFF333333
 
+        .equ GHOST_TETROMINO_ALPHA_MULTIPLIER,  0x80
+
 
 
 /* Data for all 7 tetrominos */

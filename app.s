@@ -543,7 +543,7 @@ draw_board_inner:
         mov     x23, x3         // x23 <- tetromino state
         mov     x24, x4         // x24 <- framebuffer
 
-        // Copy tetromino state
+        // Copy tetromino state for ghost
         sub     sp, sp, STRUCT_TSTATE_SIZE
         mov     x27, sp
         ldr     x9, [x23, TSTATE_ID]
@@ -555,7 +555,9 @@ draw_board_inner:
         ldr     x9, [x23, TSTATE_POS_Y]
         str     x9, [x27, TSTATE_POS_Y]
 
-
+        mov     x0, x27
+        mov     x1, x2
+        bl      move_tetromino_to_bottom        // Move ghost to bottom position
 
 
         mov     x26, 0          // x26 <- row iterator
@@ -564,25 +566,27 @@ draw_board_inner__next_row:
         mov     x25, 0          // x25 <- column iterator
 
 draw_board_inner__next_col:
+        /* w19 <- cell alpha */
+
         mov     x0, x25
         mov     x1, x26
         mov     x2, x23
         bl      get_tetromino_cell_at
-        mov     x19, 0
+        mov     w19, 0xFF
         cbnz    x0, draw_board_inner__draw_cell
 
         mov     x0, x25
         mov     x1, x26
         mov     x2, x27
         bl      get_tetromino_cell_at
-        mov     x19, 1
+        mov     w19, GHOST_TETROMINO_ALPHA_MULTIPLIER
         cbnz    x0, draw_board_inner__draw_cell
 
         mov     x0, x25
         mov     x1, x26
         mov     x2, x22
         bl      get_board_cell_at
-        mov     x19, 0
+        mov     w19, 0xFF
         cbnz    x0, draw_board_inner__draw_cell
 
         b       draw_board_inner__skip_cell
@@ -590,14 +594,15 @@ draw_board_inner__next_col:
 draw_board_inner__draw_cell:
         sub     x0, x0, TETROMINO_ID_BIAS       // x0 <- normalized cell id
         bl      get_tetromino_by_index
-        mov     x2, x0                          // x2: in struct Tetromino* <- current tetromino
+        mov     x3, x0                          // x3: in struct Tetromino* <- current tetromino
 
         mov     x9, TETRIS_CELL_SIZE
         mul     x0, x9, x25     // x0 <- x offset in coords to current cell
         add     x0, x20, x0     // x0 <- bottom left x of current cell
         mul     x1, x9, x26     // x1 <- y offset in coords to current cell
         add     x1, x21, x1     // x1 <- bottom left y of current cell
-        mov     x3, x24
+        mov     w2, w19         // w2 <- cell alpha
+        mov     x4, x24
         bl      draw_tetris_cell
 
 draw_board_inner__skip_cell:
@@ -975,7 +980,7 @@ draw_destroy_particles__loop:
         sub     x5, x5, x4
         mov     x0, DESTROY_PARTICLE_RADIUS
         mul     x2, x5, x0
-        lsr     x2, x2, 5
+        asr     x2, x2, 5
         mov     x10, x2
         mov     x25, x2
 

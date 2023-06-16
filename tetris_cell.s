@@ -81,20 +81,41 @@ draw_tetromino_by_colors_at__skip_cell:
  * Params:
  *      x0: u64                 <- bottom left x position (game coordinates)
  *      x1: u64                 <- bottom left y position (game coordinates)
- *      x2: in Tetromino*       <- tetromino
- *      x3: out u32*            <- framebuffer
+ *      w2: u8                  <- alpha
+ *      x3: in Tetromino*       <- tetromino
+ *      x4: out u32*            <- framebuffer
  */
 draw_tetris_cell:
         stp     lr, x19, [sp, -16]!
 
-        mov     x9, x2          // x9 <- tetromino
+        mov     w19, w2         // w19 <- alpha
 
-        mov     x5, x3          // x5 <- framebuffer
+        mov     x9, x3          // x9 <- tetromino
+
+        mov     x5, x4          // x5 <- framebuffer
         mov     x0, x0
         mov     x1, x1
         ldr     w2, [x9, TETROMINO_DIFFUSE_COLOR]
         ldr     w3, [x9, TETROMINO_SPECULAR_COLOR]
         ldr     w4, [x9, TETROMINO_AMBIENT_COLOR]
+
+        mov     w9, 0xFF
+
+        ubfx    w10, w2, 24, 8
+        mul     w10, w10, w19
+        udiv    w10, w10, w9
+        bfi     w2, w10, 24, 8
+
+        ubfx    w10, w3, 24, 8
+        mul     w10, w10, w19
+        udiv    w10, w10, w9
+        bfi     w3, w10, 24, 8
+
+        ubfx    w10, w4, 24, 8
+        mul     w10, w10, w19
+        udiv    w10, w10, w9
+        bfi     w4, w10, 24, 8
+
         bl      draw_tetris_cell_by_colors
 
         ldp     lr, x19, [sp], 16
