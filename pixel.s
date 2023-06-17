@@ -119,5 +119,103 @@ draw_argb_pixel_at:
 
 
 
+/*
+ * Params:
+ *      w0: u32         <- argb color 1
+ *      w1: u32         <- argb color 2
+ *      w2: u32         <- argb color 3
+ *      x3: u64         <- weight 1     (Q32)
+ *      x4: u64         <- weight 2     (Q32)
+ *      x5: u64         <- weight 3     (Q32)
+ * Returns:
+ *      w0: u32         <- mixed color
+ */
+mix_three_colors:
+        stp     lr, x19, [sp, -16]!
+
+        mov     w19, 0  // w19 <- result
+
+        /* Blue */
+        mov     x10, 0          // x10 <- blue accumulator      (Q32)
+
+        ubfx    w9, w0, 0, 8    // w9 = color1.b
+        mul     x9, x9, x3      // x9 = color1.b * W1   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w1, 0, 8    // w9 = color2.b
+        mul     x9, x9, x4      // x9 = color2.b * W2   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w2, 0, 8    // w9 = color3.b
+        mul     x9, x9, x5      // x9 = color3.b * W3   (Q32)
+        add     x10, x10, x9
+
+        lsr     x10, x10, 32    // x10 = (color1.b * W1) + (color2.b * W2) + (color3.b * W3)
+        bfi     w19, w10, 0, 8
+
+
+        /* Green */
+        mov     x10, 0          // x10 <- blue accumulator      (Q32)
+
+        ubfx    w9, w0, 8, 8    // w9 = color1.b
+        mul     x9, x9, x3      // x9 = color1.b * W1   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w1, 8, 8    // w9 = color2.b
+        mul     x9, x9, x4      // x9 = color2.b * W2   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w2, 8, 8    // w9 = color3.b
+        mul     x9, x9, x5      // x9 = color3.b * W3   (Q32)
+        add     x10, x10, x9
+
+        lsr     x10, x10, 32    // x10 = (color1.b * W1) + (color2.b * W2) + (color3.b * W3)
+        bfi     w19, w10, 8, 8
+
+
+        /* Red */
+        mov     x10, 0          // x10 <- blue accumulator      (Q32)
+
+        ubfx    w9, w0, 16, 8   // w9 = color1.b
+        mul     x9, x9, x3      // x9 = color1.b * W1   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w1, 16, 8   // w9 = color2.b
+        mul     x9, x9, x4      // x9 = color2.b * W2   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w2, 16, 8   // w9 = color3.b
+        mul     x9, x9, x5      // x9 = color3.b * W3   (Q32)
+        add     x10, x10, x9
+
+        lsr     x10, x10, 32    // x10 = (color1.b * W1) + (color2.b * W2) + (color3.b * W3)
+        bfi     w19, w10, 16, 8
+
+        /* Alpha */
+        mov     x10, 0          // x10 <- blue accumulator      (Q32)
+
+        ubfx    w9, w0, 24, 8    // w9 = color1.b
+        mul     x9, x9, x3      // x9 = color1.b * W1   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w1, 24, 8    // w9 = color2.b
+        mul     x9, x9, x4      // x9 = color2.b * W2   (Q32)
+        add     x10, x10, x9
+
+        ubfx    w9, w2, 24, 8    // w9 = color3.b
+        mul     x9, x9, x5      // x9 = color3.b * W3   (Q32)
+        add     x10, x10, x9
+
+        lsr     x10, x10, 32    // x10 = (color1.b * W1) + (color2.b * W2) + (color3.b * W3)
+        bfi     w19, w10, 24, 8
+
+
+
+
+        mov     w0, w19
+
+        ldp     lr, x19, [sp], 16
+        ret
+
 
 .endif

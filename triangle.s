@@ -122,7 +122,16 @@ draw_triangle_barycentric__next_col:
         stp     x13, x14, [sp, 48]
         stp     x15, x7, [sp, 64]
 
-        mov     w0, w10
+        mov     w0, 0x00FF0000
+        mov     w1, 0xFF00FF00
+        mov     w2, 0xFF0000FF
+        mov     x3, x24
+        mov     x4, x25
+        mov     x5, x26
+        bl      mix_three_colors
+
+        ldp     x15, x7, [sp, 64]
+
         mov     x1, x7
         bl      draw_argb_pixel
 
@@ -132,11 +141,6 @@ draw_triangle_barycentric__next_col:
         ldp     x9, x10, [sp, 16]
         ldp     x4, x5, [sp], 80
 
-
-
-
-
-        // str     w12, [x7]
 
 
 draw_triangle_barycentric__skip_pixel:
