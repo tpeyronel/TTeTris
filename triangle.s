@@ -93,6 +93,27 @@ draw_triangle_barycentric__next_col:
         cmp     x10, 0
         b.lt    draw_triangle_barycentric__skip_pixel
 
+        mov     x12, 0
+
+        mov     x13, 0xFF
+        mul     x13, x13, x24
+        lsr     x13, x13, 32
+        lsl     x13, x13, 16
+        add     x12, x12, x13
+
+
+        mov     x13, 0xFF
+        mul     x13, x13, x27
+        lsr     x13, x13, 32
+        lsl     x13, x13, 8
+        add     x12, x12, x13
+
+
+        mov     x13, 0xFF
+        mul     x13, x13, x10
+        lsr     x13, x13, 32
+        lsl     x13, x13, 0
+        add     x12, x12, x13
 
 
 
@@ -101,7 +122,9 @@ draw_triangle_barycentric__next_col:
 
 
 
-        str     w6, [x7]
+
+
+        str     w12, [x7]
 
 
 draw_triangle_barycentric__skip_pixel:

@@ -268,12 +268,12 @@ game_loop__skip_held_piece:
         bl      draw_destroy_particles
 
 
-        mov     x0, 40
+        mov     x0, 120
         mov     x1, 80
         mov     x2, 300
-        mov     x3, 160
-        mov     x4, 200
-        mov     x5, 300
+        mov     x3, 250
+        mov     x4, 20
+        mov     x5, 250
         mov     w6, 0xFFFFFF
         mov     x7, x28
         bl      draw_triangle_barycentric
