@@ -27,6 +27,105 @@ TRIANGLE_S:
         .endm
 
 
+
+/*
+ * Params:
+ *      x0: u64         <- X1 coord (game coordinates)
+ *      x1: u64         <- Y1 coord (game coordinates)
+ *      x2: u64         <- X2 coord (game coordinates)
+ *      x3: u64         <- Y2 coord (game coordinates)
+ *      x4: u64         <- X3 coord (game coordinates)
+ *      x5: u64         <- Y3 coord (game coordinates)
+ *      w6: u32         <- argb color
+ *      x7: out* u32    <- framebuffer
+ */
+draw_triangle_barycentric:
+        stp     lr, x19, [sp, -80]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+        stp     x26, x27, [sp, 64]
+
+        sub     x8, x0, x4      // x8 = X1 - X3
+        sub     x9, x4, x2      // x9 = X3 - X2
+
+        sub     x10, x1, x5     // x10 = Y1 - Y3
+        sub     x11, x3, x5     // x11 = Y2 - Y3
+        sub     x15, x5, x1     // x15 = Y3 - Y1
+
+        mul     x12, x11, x8    // x12 = (Y2 - Y3)(X1 - X3)
+        mul     x13, x9, x10    // x13 = (X3 - X2)(Y1 - Y3)
+
+        add     x14, x12, x13   // x14 = (Y2 - Y3)(X1 - X3) + (X3 - X2)(Y1 - Y3)
+
+
+        mov     x21, 0
+
+draw_triangle_barycentric__next_row:
+        mov     x20, 0
+
+        sub     x23, x21, x5    // x23 = Py - Y3
+        mul     x26, x23, x8    // x26 = (X1 - X3)(Py - Y3)
+        mul     x23, x23, x9    // x23 = (X3 - X2)(Py - Y3)
+
+draw_triangle_barycentric__next_col:
+        sub     x22, x20, x4    // x22 = Px - X3
+        mul     x25, x22, x15   // x25 = (Y3 - Y1)(Px - X3)
+        mul     x22, x22, x11   // x22 = (Y2 - Y3)(Px - X3)
+
+        add     x24, x22, x23   // x24 = (Y2 - Y3)(Px - X3) + (X3 - X2)(Py - Y3)
+        lsl     x24, x24, 32    // x24 = (Y2 - Y3)(Px - X3) + (X3 - X2)(Py - Y3)        (Q32)
+        sdiv    x24, x24, x14   // x24 = W1     (Q32)
+
+        add     x27, x25, x26   // x27 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)
+        lsl     x27, x27, 32    // x27 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)        (Q32)
+        sdiv    x27, x27, x14   // x27 = W2     (Q32)
+
+        cmp     x24, 0
+        b.lt    draw_triangle_barycentric__skip_pixel
+
+        cmp     x27, 0
+        b.lt    draw_triangle_barycentric__skip_pixel
+
+        mov     x10, (1 << 32)
+        sub     x10, x10, x24
+        sub     x10, x10, x27
+        cmp     x10, 0
+        b.lt    draw_triangle_barycentric__skip_pixel
+
+
+
+
+
+
+
+
+
+        str     w6, [x7]
+
+
+draw_triangle_barycentric__skip_pixel:
+        add     x7, x7, BYTES_PER_PIXEL
+
+        add     x20, x20, 1
+        cmp     x20, SCREEN_WIDTH
+        b.lt    draw_triangle_barycentric__next_col
+
+        add     x21, x21, 1
+        cmp     x21, SCREEN_HEIGH
+        b.lt    draw_triangle_barycentric__next_row
+
+
+
+        ldp     x26, x27, [sp, 64]
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 80
+        ret
+
+
+
 /*
  * Params:
  *      x0: u64         <- x0 coord (game coordinates)
