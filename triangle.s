@@ -122,13 +122,13 @@ draw_triangle_barycentric__next_col:
         stp     x13, x14, [sp, 48]
         stp     x15, x7, [sp, 64]
 
-        mov     w0, 0x00FF0000
+        mov     w0, 0xFFFF0000
         mov     w1, 0xFF00FF00
-        mov     w2, 0xFF0000FF
+        ldr     w2, =0x3F0000FF
         mov     x3, x24
         mov     x4, x25
         mov     x5, x26
-        bl      mix_three_colors
+        bl      triple_color_lerp
 
         ldp     x15, x7, [sp, 64]
 
