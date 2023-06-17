@@ -46,85 +46,97 @@ draw_triangle_barycentric:
         stp     x24, x25, [sp, 48]
         stp     x26, x27, [sp, 64]
 
-        sub     x8, x0, x4      // x8 = X1 - X3
-        sub     x9, x4, x2      // x9 = X3 - X2
+        sub     x15, x3, x5     // x15 = Y2 - Y3
+        sub     x14, x5, x1     // x14 = Y3 - Y1
+        sub     x13, x4, x2     // x13 = X3 - X2
+        sub     x12, x0, x4     // x12 = X1 - X3
 
-        sub     x10, x1, x5     // x10 = Y1 - Y3
-        sub     x11, x3, x5     // x11 = Y2 - Y3
-        sub     x15, x5, x1     // x15 = Y3 - Y1
-
-        mul     x12, x11, x8    // x12 = (Y2 - Y3)(X1 - X3)
-        mul     x13, x9, x10    // x13 = (X3 - X2)(Y1 - Y3)
-
-        add     x14, x12, x13   // x14 = (Y2 - Y3)(X1 - X3) + (X3 - X2)(Y1 - Y3)
+        neg     x9, x14         // x9 = Y1 - Y3
+        mul     x9, x13, x9     // x9 = (X3 - X2)(Y1 - Y3)
+        mul     x11, x15, x12   // x11 = (Y2 - Y3)(X1 - X3)
+        add     x11, x11, x9    // x11 = (Y2 - Y3)(X1 - X3) + (X3 - X2)(Y1 - Y3)        <- denominator
 
 
-        mov     x21, 0
+
+        mov     x21, 0  // y iterator
 
 draw_triangle_barycentric__next_row:
-        mov     x20, 0
+        mov     x20, 0  // x iterator
 
-        sub     x23, x21, x5    // x23 = Py - Y3
-        mul     x26, x23, x8    // x26 = (X1 - X3)(Py - Y3)
-        mul     x23, x23, x9    // x23 = (X3 - X2)(Py - Y3)
+        sub     x9, x21, x5     // x9 = Py - Y3
+        mul     x22, x13, x9    // x22 = (X3 - X2)(Py - Y3)
+        mul     x23, x12, x9    // x23 = (X1 - X3)(Py - Y3)
 
 draw_triangle_barycentric__next_col:
-        sub     x22, x20, x4    // x22 = Px - X3
-        mul     x25, x22, x15   // x25 = (Y3 - Y1)(Px - X3)
-        mul     x22, x22, x11   // x22 = (Y2 - Y3)(Px - X3)
+        sub     x9, x20, x4     // x9 = Px - X3
+        mul     x24, x15, x9    // x24 = (Y2 - Y3)(Px - X3)
+        add     x24, x24, x22   // x24 = (Y2 - Y3)(Px - X3) + (X3 - X2)(Py - Y3)
+        mul     x25, x14, x9    // x25 = (Y3 - Y1)(Px - X3)
+        add     x25, x25, x23   // x25 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)
 
-        add     x24, x22, x23   // x24 = (Y2 - Y3)(Px - X3) + (X3 - X2)(Py - Y3)
         lsl     x24, x24, 32    // x24 = (Y2 - Y3)(Px - X3) + (X3 - X2)(Py - Y3)        (Q32)
-        sdiv    x24, x24, x14   // x24 = W1     (Q32)
+        lsl     x25, x25, 32    // x25 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)        (Q32)
 
-        add     x27, x25, x26   // x27 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)
-        lsl     x27, x27, 32    // x27 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)        (Q32)
-        sdiv    x27, x27, x14   // x27 = W2     (Q32)
+        sdiv    x24, x24, x11   // x24 = W1     (Q32)
+        sdiv    x25, x25, x11   // x25 = W2     (Q32)
 
         cmp     x24, 0
         b.lt    draw_triangle_barycentric__skip_pixel
 
-        cmp     x27, 0
+        cmp     x25, 0
         b.lt    draw_triangle_barycentric__skip_pixel
 
-        mov     x10, (1 << 32)
-        sub     x10, x10, x24
-        sub     x10, x10, x27
-        cmp     x10, 0
+        mov     x26, (1 << 32)  // x26 = 1                      (Q32)
+        sub     x26, x26, x24   // x26 = 1 - W1                 (Q32)
+        sub     x26, x26, x25   // x26 = W3 = 1 - W1 - W2       (Q32)
+        cmp     x26, 0
         b.lt    draw_triangle_barycentric__skip_pixel
 
-        mov     x12, 0
+        mov     x10, 0
 
-        mov     x13, 0xFF
-        mul     x13, x13, x24
-        lsr     x13, x13, 32
-        lsl     x13, x13, 16
-        add     x12, x12, x13
+        mov     x9, 0xFF
+        mul     x9, x9, x24
+        lsr     x9, x9, 32
+        lsl     x9, x9, 16
+        add     x10, x10, x9
 
+        mov     x9, 0xFF
+        mul     x9, x9, x25
+        lsr     x9, x9, 32
+        lsl     x9, x9, 8
+        add     x10, x10, x9
 
-        mov     x13, 0xFF
-        mul     x13, x13, x27
-        lsr     x13, x13, 32
-        lsl     x13, x13, 8
-        add     x12, x12, x13
+        mov     x9, 0xFF
+        mul     x9, x9, x26
+        lsr     x9, x9, 32
+        lsl     x9, x9, 0
+        add     x10, x10, x9
 
-
-        mov     x13, 0xFF
-        mul     x13, x13, x10
-        lsr     x13, x13, 32
-        lsl     x13, x13, 0
-        add     x12, x12, x13
-
-
-
+        mov     x9, 0xCF000000
+        add     x10, x10, x9
 
 
+        stp     x4, x5, [sp, -80]!
+        stp     x9, x10, [sp, 16]
+        stp     x11, x12, [sp, 32]
+        stp     x13, x14, [sp, 48]
+        stp     x15, x7, [sp, 64]
+
+        mov     w0, w10
+        mov     x1, x7
+        bl      draw_argb_pixel
+
+        ldp     x15, x7, [sp, 64]
+        ldp     x13, x14, [sp, 48]
+        ldp     x11, x12, [sp, 32]
+        ldp     x9, x10, [sp, 16]
+        ldp     x4, x5, [sp], 80
 
 
 
 
 
-        str     w12, [x7]
+        // str     w12, [x7]
 
 
 draw_triangle_barycentric__skip_pixel:
