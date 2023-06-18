@@ -57,11 +57,51 @@ draw_triangle_barycentric:
         add     x11, x11, x9    // x11 = (Y2 - Y3)(X1 - X3) + (X3 - X2)(Y1 - Y3)        <- denominator
 
 
+        /* Compute triangle bounding box */
 
-        mov     x21, 0  // y iterator
+        mov     x20, x0
+        cmp     x20, x2
+        csel    x20, x20, x2, ls
+        cmp     x20, x4
+        csel    x20, x20, x4, ls        // x20 <- x iterator (BB min x)
+
+        mov     x21, x1
+        cmp     x21, x3
+        csel    x21, x21, x3, ls
+        cmp     x21, x5
+        csel    x21, x21, x5, ls        // x21 <- y iterator (BB min y)
+
+        mov     x19, x0
+        cmp     x19, x2
+        csel    x19, x19, x2, hs
+        cmp     x19, x4
+        csel    x19, x19, x4, hs        // x19 <- last x (BB max x)
+
+        mov     x27, x1
+        cmp     x27, x3
+        csel    x27, x27, x3, hs
+        cmp     x27, x5
+        csel    x27, x27, x5, hs        // x27 <- last y (BB max y)
+
+        /* Save useful values to stack */
+        sub     x9, x19, x20
+        add     x9, x9, 1               // x9 <- BB width
+        stp     x20, x9, [sp, -16]!     // Save BB min x and BB width to stack
+
+
+        /* Position framebuffer pointer to top left of bounding box */
+        mov     x9, SCREEN_WIDTH
+        mul     x9, x9, x21
+        add     x9, x9, x20
+        lsl     x9, x9, BYTES_PER_PIXEL_SHIFT
+        add     x7, x7, x9
+
+
+
+        /* Draw triangle */
 
 draw_triangle_barycentric__next_row:
-        mov     x20, 0  // x iterator
+        ldr     x20, [sp]       // x20 <- BB min x
 
         sub     x9, x21, x5     // x9 = Py - Y3
         mul     x22, x13, x9    // x22 = (X3 - X2)(Py - Y3)
@@ -130,7 +170,7 @@ draw_triangle_barycentric__next_col:
         mov     x5, x26
         bl      triple_color_lerp
 
-        ldp     x15, x7, [sp, 64]
+        ldp     x15, x7, [sp, 64]       // Restore x7 for draw_argb_pixel
 
         mov     x1, x7
         bl      draw_argb_pixel
@@ -147,14 +187,21 @@ draw_triangle_barycentric__skip_pixel:
         add     x7, x7, BYTES_PER_PIXEL
 
         add     x20, x20, 1
-        cmp     x20, SCREEN_WIDTH
-        b.lt    draw_triangle_barycentric__next_col
+        cmp     x20, x19        // Check if we are past bounding box horizontal end
+        b.le    draw_triangle_barycentric__next_col
+
+        ldr     x9, [sp, 8]
+        sub     x9, x9, SCREEN_WIDTH    // x9 = BB width - SCREEN_WIDTH = -(SCREEN_WIDTH - BB width)
+        lsl     x9, x9, BYTES_PER_PIXEL_SHIFT
+        sub     x7, x7, x9              // x7 += (SCREEN_WIDTH - BB width) * BYTES_PER_PIXEL
 
         add     x21, x21, 1
-        cmp     x21, SCREEN_HEIGH
-        b.lt    draw_triangle_barycentric__next_row
+        cmp     x21, x27        // Check if we are past bounding box vertical end
+        b.le    draw_triangle_barycentric__next_row
 
 
+
+        add     sp, sp, 16      // Pop BB min x, BB width
 
         ldp     x26, x27, [sp, 64]
         ldp     x24, x25, [sp, 48]
