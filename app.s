@@ -66,22 +66,6 @@
         .equ COLLISION_RESULT_OUT_OF_BOUNDS,    0b01
         .equ COLLISION_RESULT_EXISTING_BLOCK,   0b10
 
-/* struct GameState */
-        .equ IS_PAUSED,                 0                                               // bool (u64)
-        .equ LAST_TICK,                 IS_PAUSED + 8                                   // u32
-        .equ LAST_DROP,                 LAST_TICK + 4                                   // u32
-        .equ TICK_COUNTER,              LAST_DROP + 4                                   // u64
-        .equ HELD_PIECE_ID,             TICK_COUNTER + 8                                // u64 <- 0 or tetromino id with bias
-        .equ CONSUMED_SWAP,             HELD_PIECE_ID + 8                               // bool (u64)
-        .equ GAME_STATS,                CONSUMED_SWAP + 8                               // struct GameStats
-        .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE                     // struct InputState
-        .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
-        .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
-        .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
-        .equ PARTICLE_MANAGER,          BOARD_STATE + STRUCT_BSTATE_SIZE                // struct ParticleManager
-
-        .equ STRUCT_GAME_STATE_SIZE,    PARTICLE_MANAGER + STRUCT_PM_SIZE
-
 /* struct GameStats */
         .equ GS_SCORE,                  0                       // u64
         .equ GS_COMPLETED_ROWS,         GS_SCORE + 8            // u64
@@ -113,6 +97,23 @@
         .equ BSTATE_DESTROYED_ROWS,	BSTATE_BOARD + BOARD_SIZE_IN_BYTES	// u8[4]
 
         .equ STRUCT_BSTATE_SIZE,        BSTATE_DESTROYED_ROWS + 4
+
+
+/* struct GameState */
+        .equ IS_PAUSED,                 0                                               // bool (u64)
+        .equ LAST_TICK,                 IS_PAUSED + 8                                   // u32
+        .equ LAST_DROP,                 LAST_TICK + 4                                   // u32
+        .equ TICK_COUNTER,              LAST_DROP + 4                                   // u64
+        .equ HELD_PIECE_ID,             TICK_COUNTER + 8                                // u64 <- 0 or tetromino id with bias
+        .equ CONSUMED_SWAP,             HELD_PIECE_ID + 8                               // bool (u64)
+        .equ GAME_STATS,                CONSUMED_SWAP + 8                               // struct GameStats
+        .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE                     // struct InputState
+        .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
+        .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
+        .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
+        .equ PARTICLE_MANAGER,          BOARD_STATE + STRUCT_BSTATE_SIZE                // struct ParticleManager
+
+        .equ STRUCT_GAME_STATE_SIZE,    PARTICLE_MANAGER + STRUCT_PM_SIZE
 
 
 
@@ -224,6 +225,45 @@ game_loop__dont_update:
 
         mov     x0, x28
         bl      draw_canvas
+
+
+        mov     x0, 0
+        mov     x1, 256
+        bl      rand_gen_in_range
+        cbz     x0, game_loop__end_new_spark
+
+        mov     x0, 0
+        mov     x1, SCREEN_WIDTH
+        bl      rand_gen_in_range
+        mov     x9, x0          // x9 <- x pos
+
+        mov     x0, 0
+        mov     x1, SCREEN_HEIGH
+        bl      rand_gen_in_range
+        mov     x10, x0         // x10 <- y pos
+
+        mov     x0, 0
+        mov     x1, 1 << 8
+        bl      rand_gen_in_range
+        sub     x0, x0, 1 << 7
+        lsl     x11, x0, 32     // x11 <- velocity x
+
+        mov     x0, 0
+        mov     x1, 1 << 8
+        bl      rand_gen_in_range
+        sub     x0, x0, 1 << 7
+        lsl     x12, x0, 32     // x12 <- velocity y
+
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, x9
+        mov     x2, x10
+        mov     x3, 123
+        ldr     x4, =0xFFFFFFFF
+        mov     x5, x11
+        mov     x6, x12
+        bl      particle_manager_create_spark
+game_loop__end_new_spark:
+
 
 
         add     x0, sp, PARTICLE_MANAGER

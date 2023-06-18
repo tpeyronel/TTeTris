@@ -5,6 +5,7 @@ PARTICLE_S:
         .include "./star.s"
         .include "./util.s"
         .include "./fixed_point.s"
+        .include "./line.s"
 
         .equ MAX_PARTICLES,     256
 
@@ -40,6 +41,10 @@ PARTICLE_TYPES:
         .equ PARTICLE_TYPE_STAR,        0
         .dword particle_star_update
         .dword particle_star_draw
+/* Particle Spark */
+        .equ PARTICLE_TYPE_SPARK,        1
+        .dword particle_spark_update
+        .dword particle_spark_draw
 
 
 
@@ -283,6 +288,124 @@ particle_star_draw:
         ldr     w3, [x20, PS_COLOR]
         mov     x4, x21
         bl      draw_four_point_star
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct ParticleManager*
+ *      x1: u64                                 <- x coordinate
+ *      x2: u64                                 <- y coordinate
+ *      x3: u64                                 <- size
+ *      w4: u32                                 <- color
+ *      x5: u64                                 <- velocity x (Q32)
+ *      x6: u64                                 <- velocity y (Q32)
+ */
+particle_manager_create_spark:
+        stp     lr, x19, [sp, -16]!
+        /* TODO: implement particle_manager_push */
+
+        ldr     x9, [x0, PM_PARTICLE_COUNT]
+        cmp     x9, MAX_PARTICLES
+        b.ge    particle_manager_create_spark__end
+        /* x9 <= MAX_PARTICLES - 1 */
+        // Calculate offset in bytes to new ParticleState
+        mov     x10, STRUCT_PS_SIZE
+        mul     x10, x9, x10                    // x10 <- offset in bytes to new particle from beginning of array
+        add     x10, x10, PM_PARTICLE_ARRAY     // x10 <- offset in bytes to new particle from beginning of struct
+        add     x10, x0, x10                    // x10 <- &particles[particle_count]
+
+        // Increment particle count
+        add     x9, x9, 1
+        str     x9, [x0, PM_PARTICLE_COUNT]
+
+        mov     x9, PARTICLE_TYPE_SPARK
+        str     x9, [x10, PS_PARTICLE_TYPE]
+        str     x1, [x10, PS_POS_X]
+        str     x2, [x10, PS_POS_Y]
+        str     x3, [x10, PS_SIZE]
+        str     w4, [x10, PS_COLOR]
+        str     x5, [x10, PS_PHASE]
+        str     x6, [x10, PS_FREQUENCY]
+
+        bl      get_time
+        str     w0, [x10, PS_TIMESTAMP]
+
+
+particle_manager_create_spark__end:
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct ParticleState*        <- particle state
+ * Returns:
+ *      x0: bool                                <- is alive
+ */
+particle_spark_update:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        ldr     w0, [x0, PS_TIMESTAMP]
+        bl      get_elapsed_time
+        ldr     x9, =(1500 * 1000)
+        cmp     x0, x9
+        cset    x0, lt
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in struct ParticleState*    <- particle state
+ *      x1: out u32*                    <- framebuffer
+ */
+particle_spark_draw:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x20, x0         // x20 <- particle state
+        mov     x21, x1         // x21 <- framebuffer
+
+        ldr     w0, [x20, PS_TIMESTAMP]
+        bl      get_elapsed_time
+        lsl     x0, x0, 16              // x0 <- time in us             (Q16)
+        ldr     x9, =US_PER_SECOND
+        udiv    x0, x0, x9              // x0 <- time in seconds        (Q16)
+
+        // orr     x1, xzr, 4 << 32        // x1 <- amplitude
+        // ldr     x2, [x20, PS_FREQUENCY] // x2 <- frequency
+        // ldr     x3, [x20, PS_PHASE]     // x3 <- phase
+        // bl      sine_wave_advanced
+
+        ldr     x9, [x20, PS_FREQUENCY]         // x9 <- velocity x      (Q32)
+        ldr     x10, [x20, PS_PHASE]            // x10 <- velocity y     (Q32)
+        asr     x9, x9, 16                      // x9 <- velocity x      (Q16)
+        asr     x10, x10, 16                    // x10 <- velocity y     (Q16)
+
+        mul     x2, x9, x0      // x2 <- delta x       (Q32)
+        mul     x3, x10, x0     // x3 <- delta y       (Q32)
+        q32_to_int x2, x2, x9   // x2 <- delta x
+        q32_to_int x3, x3, x9   // x3 <- delta y
+
+        ldr     x0, [x20, PS_POS_X]
+        ldr     x1, [x20, PS_POS_Y]
+        add     x2, x0, x2      // x2 <- end x coordinate
+        add     x3, x1, x3      // x3 <- end y coordinate
+
+        mov     x4, x21
+        ldr     w5, [x20, PS_COLOR]
+        bl      draw_line
 
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
