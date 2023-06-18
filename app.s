@@ -270,14 +270,13 @@ game_loop__skip_held_piece:
 
         mov     x0, 120
         mov     x1, 80
-        mov     x2, 300
-        mov     x3, 250
-        mov     x4, 20
-        mov     x5, 250
+        mov     x2, 317
+        mov     x3, 281
+        mov     x4, 17
+        mov     x5, 249
         mov     w6, 0xFFFFFF
         mov     x7, x28
         bl      draw_triangle_barycentric
-
 
 
 

@@ -55,6 +55,8 @@ draw_triangle_barycentric:
         mul     x9, x13, x9     // x9 = (X3 - X2)(Y1 - Y3)
         mul     x11, x15, x12   // x11 = (Y2 - Y3)(X1 - X3)
         add     x11, x11, x9    // x11 = (Y2 - Y3)(X1 - X3) + (X3 - X2)(Y1 - Y3)        <- denominator
+        mov     x9, (1 << 32)
+        sdiv    x11, x9, x11    // x11 = 1 / ((Y2 - Y3)(X1 - X3) + (X3 - X2)(Y1 - Y3))  <- 1 / denominator (Q32)
 
 
         /* Compute triangle bounding box */
@@ -114,11 +116,8 @@ draw_triangle_barycentric__next_col:
         mul     x25, x14, x9    // x25 = (Y3 - Y1)(Px - X3)
         add     x25, x25, x23   // x25 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)
 
-        lsl     x24, x24, 32    // x24 = (Y2 - Y3)(Px - X3) + (X3 - X2)(Py - Y3)        (Q32)
-        lsl     x25, x25, 32    // x25 = (Y3 - Y1)(Px - X3) + (X1 - X3)(Py - Y3)        (Q32)
-
-        sdiv    x24, x24, x11   // x24 = W1     (Q32)
-        sdiv    x25, x25, x11   // x25 = W2     (Q32)
+        mul     x24, x24, x11   // x24 = W1     (Q32)
+        mul     x25, x25, x11   // x25 = W2     (Q32)
 
         cmp     x24, 0
         b.lt    draw_triangle_barycentric__skip_pixel
