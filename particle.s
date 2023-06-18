@@ -9,7 +9,8 @@ PARTICLE_S:
         .equ MAX_PARTICLES,     256
 
 /* struct ParticleState */
-        .equ PS_TIMESTAMP,      0                       // u32
+        .equ PS_PARTICLE_TYPE,  0                       // u64
+        .equ PS_TIMESTAMP,      PS_PARTICLE_TYPE + 8    // u32
         .equ PS_COLOR,          PS_TIMESTAMP + 4        // u32
         .equ PS_POS_X,          PS_COLOR + 4            // u64
         .equ PS_POS_Y,          PS_POS_X + 8            // u64
@@ -24,6 +25,25 @@ PARTICLE_S:
         .equ PM_PARTICLE_COUNT,         PM_PARTICLE_ARRAY + (STRUCT_PS_SIZE * MAX_PARTICLES)    // u64 in [0..MAX_PARTICLES]
 
         .equ STRUCT_PM_SIZE,            PM_PARTICLE_COUNT + 8
+
+
+/* struct ParticleType */
+        .equ PT_UPDATE,         0               // u64/usize: (in/out struct ParticleState*) -> bool
+        .equ PT_DRAW,           PT_UPDATE + 8   // u64/usize: (in struct ParticleState*, framebuffer: in/out u32*) -> void
+
+        .equ STRUCT_PARTICLE_TYPE_SIZE,         PT_DRAW + 8
+        .equ STRUCT_PARTICLE_TYPE_SIZE_SHIFT,   4
+
+/* struct ParticleType[] */
+PARTICLE_TYPES:
+/* Particle Star */
+        .equ PARTICLE_TYPE_STAR,        0
+        .dword particle_star_update
+        .dword particle_star_draw
+
+
+
+
 
 
 
@@ -70,6 +90,8 @@ particle_manager_create_star:
         add     x9, x9, 1
         str     x9, [x0, PM_PARTICLE_COUNT]
 
+        mov     x9, PARTICLE_TYPE_STAR
+        str     x9, [x10, PS_PARTICLE_TYPE]
         str     x1, [x10, PS_POS_X]
         str     x2, [x10, PS_POS_Y]
         str     x3, [x10, PS_SIZE]
@@ -79,9 +101,6 @@ particle_manager_create_star:
 
         bl      get_time
         str     w0, [x10, PS_TIMESTAMP]
-
-
-
 
 
 particle_manager_create_star__end:
@@ -102,20 +121,24 @@ particle_manager_render:
         ldr     x19, [x0, PM_PARTICLE_COUNT]    // x19 <- remaining particles
         add     x20, x0, PM_PARTICLE_ARRAY      // x20 <- pointer to current particle
         mov     x21, x1                         // x21 <- framebuffer
+        ldr     x22, =PARTICLE_TYPES            // x22 <- pointer to global ParticleType array
 
 particle_manager_render__next:
         cmp     x19, 0          // Check if any particles remain to be drawn
         cbz     x19, particle_manager_render__end
 
-        mov     x0, x20         // x0 <- current particle*
+        ldr     x9, [x20, PS_PARTICLE_TYPE]
+        lsl     x9, x9, STRUCT_PARTICLE_TYPE_SIZE_SHIFT
+        add     x9, x22, x9             // x9 <- pointer to current particle type
+        ldr     x9, [x9, PT_DRAW]       // x9 <- particle draw function
+
+        mov     x0, x20         // x0 <- current ParticleState*
         mov     x1, x21         // x1 <- framebuffer
-        bl      particle_draw
+        blr     x9              // Draw particle
 
         sub     x19, x19, 1                     // Decrement remaining particles
         add     x20, x20, STRUCT_PS_SIZE        // Advance pointer to next particle
         b       particle_manager_render__next
-
-
 
 
 particle_manager_render__end:
@@ -127,10 +150,28 @@ particle_manager_render__end:
 
 /*
  * Params:
+ *      x0: in/out struct ParticleState*        <- particle state
+ * Returns:
+ *      x0: bool                                <- is alive
+ */
+particle_star_update:
+        stp     lr, x19, [sp, -32]!
+        stp     x20, x21, [sp, 16]
+
+        mov     x0, 1
+
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 32
+        ret
+
+
+
+/*
+ * Params:
  *      x0: in struct ParticleState*    <- particle state
  *      x1: out u32*                    <- framebuffer
  */
-particle_draw:
+particle_star_draw:
         stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
 
