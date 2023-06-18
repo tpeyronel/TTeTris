@@ -111,12 +111,97 @@ particle_manager_create_star__end:
 
 /*
  * Params:
+ *      x0: out struct ParticleState*   <- dest
+ *      x1: in struct ParticleState*    <- src
+ */
+particle_state_copy:
+        ldr     x9, [x1, PS_PARTICLE_TYPE]
+        ldr     w10, [x1, PS_TIMESTAMP]
+        ldr     w11, [x1, PS_COLOR]
+        ldr     x12, [x1, PS_POS_X]
+        ldr     x13, [x1, PS_POS_Y]
+        ldr     x14, [x1, PS_SIZE]
+        ldr     x15, [x1, PS_PHASE]
+        ldr     x8, [x1, PS_FREQUENCY]
+
+        str     x9, [x0, PS_PARTICLE_TYPE]
+        str     w10, [x0, PS_TIMESTAMP]
+        str     w11, [x0, PS_COLOR]
+        str     x12, [x0, PS_POS_X]
+        str     x13, [x0, PS_POS_Y]
+        str     x14, [x0, PS_SIZE]
+        str     x15, [x0, PS_PHASE]
+        str     x8, [x0, PS_FREQUENCY]
+
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct ParticleManager*  <- particle manager
+ */
+particle_manager_update:
+        stp     lr, x19, [sp, -48]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+
+        ldr     x19, [x0, PM_PARTICLE_COUNT]    // x19 <- remaining particles
+        add     x20, x0, PM_PARTICLE_ARRAY      // x20 <- pointer to current particle
+        mov     x21, x0                         // x21 <- particle manager
+        ldr     x22, =PARTICLE_TYPES            // x22 <- pointer to global ParticleType array
+
+particle_manager_update__next:
+        cbz     x19, particle_manager_update__end       // Check if any particles remain to be updated
+        sub     x19, x19, 1     // Decrement remaining particles
+
+        ldr     x9, [x20, PS_PARTICLE_TYPE]
+        lsl     x9, x9, STRUCT_PARTICLE_TYPE_SIZE_SHIFT
+        add     x9, x22, x9             // x9 <- pointer to current particle type
+        ldr     x9, [x9, PT_UPDATE]     // x9 <- particle update function
+
+        mov     x0, x20         // x0 <- current ParticleState*
+        blr     x9              // Update particle
+        cbnz    x0, particle_manager_update__still_alive
+
+        /* Particle is dead, remove it by inserting last particle in this slot */
+        ldr     x9, [x21, PM_PARTICLE_COUNT]    // x9 should not be 0   (0 < x19 (+ 1) <= x9)
+        sub     x9, x9, 1                       // x9 <- index of last particle state
+        str     x9, [x21, PM_PARTICLE_COUNT]    // Decrement particle count
+
+        mov     x10, STRUCT_PS_SIZE
+        mul     x10, x9, x10                    // x10 <- offset in bytes to last particle state
+        add     x10, x10, PM_PARTICLE_ARRAY     // x10 <- offset in bytes to last particle state from beginning of particle manager
+        add     x10, x21, x10                   // x10 <- pointer to last particle state (may be equal to x20)
+
+        mov     x0, x20         // x0 <- current ParticleState*
+        mov     x1, x10         // x1 <- last ParticleState*
+        bl      particle_state_copy     // Copy ParticleState* of last particle into current slot
+
+        b       particle_manager_update__next
+
+particle_manager_update__still_alive:
+        add     x20, x20, STRUCT_PS_SIZE        // Advance pointer to next particle
+        b       particle_manager_update__next
+
+
+particle_manager_update__end:
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 48
+        ret
+
+
+
+/*
+ * Params:
  *      x0: in struct ParticleManager*  <- particle manager
  *      x1: out u32*                    <- framebuffer
  */
 particle_manager_render:
-        stp     lr, x19, [sp, -32]!
+        stp     lr, x19, [sp, -48]!
         stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
 
         ldr     x19, [x0, PM_PARTICLE_COUNT]    // x19 <- remaining particles
         add     x20, x0, PM_PARTICLE_ARRAY      // x20 <- pointer to current particle
@@ -124,8 +209,7 @@ particle_manager_render:
         ldr     x22, =PARTICLE_TYPES            // x22 <- pointer to global ParticleType array
 
 particle_manager_render__next:
-        cmp     x19, 0          // Check if any particles remain to be drawn
-        cbz     x19, particle_manager_render__end
+        cbz     x19, particle_manager_render__end       // Check if any particles remain to be drawn
 
         ldr     x9, [x20, PS_PARTICLE_TYPE]
         lsl     x9, x9, STRUCT_PARTICLE_TYPE_SIZE_SHIFT
@@ -142,8 +226,9 @@ particle_manager_render__next:
 
 
 particle_manager_render__end:
+        ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 32
+        ldp     lr, x19, [sp], 48
         ret
 
 

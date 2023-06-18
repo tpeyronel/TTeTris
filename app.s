@@ -227,6 +227,10 @@ game_loop__dont_update:
 
 
         add     x0, sp, PARTICLE_MANAGER
+        bl      particle_manager_update
+
+
+        add     x0, sp, PARTICLE_MANAGER
         mov     x1, x28
         bl      particle_manager_render
 
