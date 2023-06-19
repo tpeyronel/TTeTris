@@ -388,14 +388,36 @@ particle_spark_draw:
 
         ldr     w0, [x20, PSSPARK_TIMESTAMP]
         bl      get_elapsed_time
-        lsl     x0, x0, 16              // x0 <- time in us             (Q16)
+        lsl     x0, x0, 32              // x0 <- elapsed time   (Q32)
+        ldr     x9, [x20, PSSPARK_DURATION]
+        udiv    x9, x0, x9              // x9 <- stage          (Q32)
+        mov     x10, 1 << 32
+        sub     x0, x10, x9             // x0 <- 1 - stage
+        lsl     x0, x0, 1               // x0 <- 2 * (1 - stage)
+        bl      smooth_step             // x0 <- alpha multiplier       (Q32)
+        mov     x9, 0x7F
+        mul     x9, x0, x9              // x9 <- alpha                  (Q32)
+        lsr     x9, x9, 32              // x9 <- alpha
+        ldr     w19, [x20, PSSPARK_COLOR]
+        mov     w19, 0
+        bfi     w19, w9, 16, 8
+        bfi     w19, w9, 8, 8
+        bfi     w19, w9, 0, 8
+
+
+
+
+        orr     x1, xzr, 4 << 32        // x1 <- amplitude
+        ldr     x2, [x20, PSSTAR_FREQUENCY] // x2 <- frequency
+        ldr     x3, [x20, PSSTAR_PHASE]     // x3 <- phase
+        bl      sine_wave_advanced
+
+
+        ldr     w0, [x20, PSSPARK_TIMESTAMP]
+        bl      get_elapsed_time
+        lsl     x0, x0, 16              // x0 <- elapsed time in us     (Q16)
         ldr     x9, =US_PER_SECOND
         udiv    x0, x0, x9              // x0 <- time in seconds        (Q16)
-
-        // orr     x1, xzr, 4 << 32        // x1 <- amplitude
-        // ldr     x2, [x20, PSSTAR_FREQUENCY] // x2 <- frequency
-        // ldr     x3, [x20, PSSTAR_PHASE]     // x3 <- phase
-        // bl      sine_wave_advanced
 
         ldr     x9, [x20, PSSPARK_VELOCITY_X]         // x9 <- velocity x      (Q32)
         ldr     x10, [x20, PSSPARK_VELOCITY_Y]        // x10 <- velocity y     (Q32)
@@ -413,7 +435,7 @@ particle_spark_draw:
         add     x3, x1, x3      // x3 <- end y coordinate
 
         mov     x4, x21
-        ldr     w5, [x20, PSSPARK_COLOR]
+        mov     w5, w19
         bl      draw_line
 
         ldp     x20, x21, [sp, 16]

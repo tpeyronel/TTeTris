@@ -117,6 +117,38 @@ sine_wave_right:
 
 
 
+/*
+ * Params:
+ *      x0: i64 (Q32)   <- x
+ * Returns:
+ *      x0: u64 (Q32)   <- smooth_step(x)
+ */
+smooth_step:
+        stp     lr, x19, [sp, -16]!
+
+        cmp     x0, 0
+        csel    x0, xzr, x0, le         // x0 <- max(0, x)
+
+        mov     x9, 1 << 32
+        cmp     x0, x9
+        csel    x0, x9, x0, ge          // x0 <- min(1, max(0, x))
+
+        /* 0.0 <= x <= 1.0 */
+
+        lsr     x9, x0, 16      //  x9 <- x                     (Q16)
+        mul     x9, x9, x9      //  x9 <- x^2                   (Q32)
+        mov     x10, 3 << 32    // x10 <- 3                     (Q32)
+        lsl     x0, x0, 1       //  x0 <- 2x                    (Q32)
+        sub     x10, x10, x0    // x10 <- 3 - 2x                (Q32)
+        lsr     x9, x9, 16      //  x9 <- x^2                   (Q16)
+        lsr     x10, x10, 16    // x10 <- 3 - 2x                (Q16)
+        mul     x0, x9, x10     //  x0 <- (x^2) * (3 - 2x)      (Q32)
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
 
 
 

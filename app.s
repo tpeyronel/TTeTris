@@ -254,8 +254,8 @@ game_loop__dont_update:
         sub     x0, x0, 1 << 9
         lsl     x12, x0, 32     // x12 <- velocity y
 
-        mov     x0, 100
-        mov     x1, 250
+        mov     x0, 150
+        mov     x1, 450
         bl      rand_gen_in_range
         mov     x13, 1000
         mul     x13, x0, x13    // x13 <- duration
