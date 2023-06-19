@@ -9,23 +9,34 @@ PARTICLE_S:
 
         .equ MAX_PARTICLES,     256
 
-/* struct ParticleState */
-        .equ PS_PARTICLE_TYPE,  0                       // u64
-        .equ PS_TIMESTAMP,      PS_PARTICLE_TYPE + 8    // u32
-        .equ PS_COLOR,          PS_TIMESTAMP + 4        // u32
-        .equ PS_POS_X,          PS_COLOR + 4            // u64
-        .equ PS_POS_Y,          PS_POS_X + 8            // u64
-        .equ PS_SIZE,           PS_POS_Y + 8            // u64
-        .equ PS_PHASE,          PS_SIZE + 8             // u64 (Q32)
-        .equ PS_FREQUENCY,      PS_PHASE + 8            // u64 (Q32)
+        .equ MAX_STRUCT_PS_SIZE,        8 * 16  // Must be multiple of 32 to work with particle_state_copy
 
-        .equ STRUCT_PS_SIZE,    PS_FREQUENCY + 8
+/* struct ParticleState */
+        .equ PS_PARTICLE_TYPE,          0                               // u64
+        .equ PS_USER_DATA,              PS_PARTICLE_TYPE + 8            // size: MAX_STRUCT_PS_SIZE - 8
+
+/* struct StarParticleState */
+        .equ PSSTAR_TIMESTAMP,          PS_PARTICLE_TYPE + 8            // u32
+        .equ PSSTAR_COLOR,              PSSTAR_TIMESTAMP + 4            // u32
+        .equ PSSTAR_POS_X,              PSSTAR_COLOR + 4                // u64
+        .equ PSSTAR_POS_Y,              PSSTAR_POS_X + 8                // u64
+        .equ PSSTAR_SIZE,               PSSTAR_POS_Y + 8                // u64
+        .equ PSSTAR_PHASE,              PSSTAR_SIZE + 8                 // u64 (Q32)
+        .equ PSSTAR_FREQUENCY,          PSSTAR_PHASE + 8                // u64 (Q32)
+
+/* struct SparkParticleState */
+        .equ PSSPARK_TIMESTAMP,         PS_PARTICLE_TYPE + 8            // u32
+        .equ PSSPARK_COLOR,             PSSPARK_TIMESTAMP + 4           // u32
+        .equ PSSPARK_POS_X,             PSSPARK_COLOR + 4               // u64
+        .equ PSSPARK_POS_Y,             PSSPARK_POS_X + 8               // u64
+        .equ PSSPARK_VELOCITY_X,        PSSPARK_POS_Y + 8               // u64 (Q32)
+        .equ PSSPARK_VELOCITY_Y,        PSSPARK_VELOCITY_X + 8          // u64 (Q32)
 
 /* struct ParticleManager */
-        .equ PM_PARTICLE_ARRAY,         0                                                       // struct ParticleState[MAX_PARTICLES]
-        .equ PM_PARTICLE_COUNT,         PM_PARTICLE_ARRAY + (STRUCT_PS_SIZE * MAX_PARTICLES)    // u64 in [0..MAX_PARTICLES]
+        .equ PM_PARTICLE_COUNT,         0                               // u64 in [0..MAX_PARTICLES]
+        .equ PM_PARTICLE_ARRAY,         PM_PARTICLE_COUNT + 8           // struct ParticleState[MAX_PARTICLES]
 
-        .equ STRUCT_PM_SIZE,            PM_PARTICLE_COUNT + 8
+        .equ STRUCT_PM_SIZE,            PM_PARTICLE_ARRAY + (MAX_STRUCT_PS_SIZE * MAX_PARTICLES)
 
 
 /* struct ParticleType */
@@ -86,7 +97,7 @@ particle_manager_create_star:
         b.ge    particle_manager_create_star__end
 
         // Calculate offset in bytes to new ParticleState
-        mov     x10, STRUCT_PS_SIZE
+        mov     x10, MAX_STRUCT_PS_SIZE
         mul     x10, x9, x10                    // x10 <- offset in bytes to new particle from beginning of array
         add     x10, x10, PM_PARTICLE_ARRAY     // x10 <- offset in bytes to new particle from beginning of struct
         add     x10, x0, x10                    // x10 <- &particles[particle_count]
@@ -97,15 +108,15 @@ particle_manager_create_star:
 
         mov     x9, PARTICLE_TYPE_STAR
         str     x9, [x10, PS_PARTICLE_TYPE]
-        str     x1, [x10, PS_POS_X]
-        str     x2, [x10, PS_POS_Y]
-        str     x3, [x10, PS_SIZE]
-        str     w4, [x10, PS_COLOR]
-        str     x5, [x10, PS_PHASE]
-        str     x6, [x10, PS_FREQUENCY]
+        str     x1, [x10, PSSTAR_POS_X]
+        str     x2, [x10, PSSTAR_POS_Y]
+        str     x3, [x10, PSSTAR_SIZE]
+        str     w4, [x10, PSSTAR_COLOR]
+        str     x5, [x10, PSSTAR_PHASE]
+        str     x6, [x10, PSSTAR_FREQUENCY]
 
         bl      get_time
-        str     w0, [x10, PS_TIMESTAMP]
+        str     w0, [x10, PSSTAR_TIMESTAMP]
 
 
 particle_manager_create_star__end:
@@ -120,23 +131,18 @@ particle_manager_create_star__end:
  *      x1: in struct ParticleState*    <- src
  */
 particle_state_copy:
-        ldr     x9, [x1, PS_PARTICLE_TYPE]
-        ldr     w10, [x1, PS_TIMESTAMP]
-        ldr     w11, [x1, PS_COLOR]
-        ldr     x12, [x1, PS_POS_X]
-        ldr     x13, [x1, PS_POS_Y]
-        ldr     x14, [x1, PS_SIZE]
-        ldr     x15, [x1, PS_PHASE]
-        ldr     x8, [x1, PS_FREQUENCY]
+        mov     x9, MAX_STRUCT_PS_SIZE
 
-        str     x9, [x0, PS_PARTICLE_TYPE]
-        str     w10, [x0, PS_TIMESTAMP]
-        str     w11, [x0, PS_COLOR]
-        str     x12, [x0, PS_POS_X]
-        str     x13, [x0, PS_POS_Y]
-        str     x14, [x0, PS_SIZE]
-        str     x15, [x0, PS_PHASE]
-        str     x8, [x0, PS_FREQUENCY]
+particle_state_copy__next_block:
+        ldp     x10, x11, [x1]
+        ldp     x12, x13, [x1, 16]
+        stp     x10, x11, [x0]
+        stp     x12, x13, [x0, 16]
+
+        add     x0, x0, 32
+        add     x1, x1, 32
+        sub     x9, x9, 32
+        cbnz    x9, particle_state_copy__next_block
 
         ret
 
@@ -174,7 +180,7 @@ particle_manager_update__next:
         sub     x9, x9, 1                       // x9 <- index of last particle state
         str     x9, [x21, PM_PARTICLE_COUNT]    // Decrement particle count
 
-        mov     x10, STRUCT_PS_SIZE
+        mov     x10, MAX_STRUCT_PS_SIZE
         mul     x10, x9, x10                    // x10 <- offset in bytes to last particle state
         add     x10, x10, PM_PARTICLE_ARRAY     // x10 <- offset in bytes to last particle state from beginning of particle manager
         add     x10, x21, x10                   // x10 <- pointer to last particle state (may be equal to x20)
@@ -186,7 +192,7 @@ particle_manager_update__next:
         b       particle_manager_update__next
 
 particle_manager_update__still_alive:
-        add     x20, x20, STRUCT_PS_SIZE        // Advance pointer to next particle
+        add     x20, x20, MAX_STRUCT_PS_SIZE    // Advance pointer to next particle
         b       particle_manager_update__next
 
 
@@ -226,7 +232,7 @@ particle_manager_render__next:
         blr     x9              // Draw particle
 
         sub     x19, x19, 1                     // Decrement remaining particles
-        add     x20, x20, STRUCT_PS_SIZE        // Advance pointer to next particle
+        add     x20, x20, MAX_STRUCT_PS_SIZE    // Advance pointer to next particle
         b       particle_manager_render__next
 
 
@@ -274,18 +280,18 @@ particle_star_draw:
         udiv    x0, x0, x9              // x0 <- time in seconds        (Q32)
 
         orr     x1, xzr, 4 << 32        // x1 <- amplitude
-        ldr     x2, [x20, PS_FREQUENCY] // x2 <- frequency
-        ldr     x3, [x20, PS_PHASE]     // x3 <- phase
+        ldr     x2, [x20, PSSTAR_FREQUENCY] // x2 <- frequency
+        ldr     x3, [x20, PSSTAR_PHASE]     // x3 <- phase
         bl      sine_wave_advanced
 
         q32_to_int      x9, x0, x9      // x9 <- delta size
 
 
-        ldr     x0, [x20, PS_POS_X]
-        ldr     x1, [x20, PS_POS_Y]
-        ldr     x2, [x20, PS_SIZE]
+        ldr     x0, [x20, PSSTAR_POS_X]
+        ldr     x1, [x20, PSSTAR_POS_Y]
+        ldr     x2, [x20, PSSTAR_SIZE]
         add     x2, x2, x9
-        ldr     w3, [x20, PS_COLOR]
+        ldr     w3, [x20, PSSTAR_COLOR]
         mov     x4, x21
         bl      draw_four_point_star
 
@@ -314,7 +320,7 @@ particle_manager_create_spark:
         b.ge    particle_manager_create_spark__end
         /* x9 <= MAX_PARTICLES - 1 */
         // Calculate offset in bytes to new ParticleState
-        mov     x10, STRUCT_PS_SIZE
+        mov     x10, MAX_STRUCT_PS_SIZE
         mul     x10, x9, x10                    // x10 <- offset in bytes to new particle from beginning of array
         add     x10, x10, PM_PARTICLE_ARRAY     // x10 <- offset in bytes to new particle from beginning of struct
         add     x10, x0, x10                    // x10 <- &particles[particle_count]
@@ -325,15 +331,15 @@ particle_manager_create_spark:
 
         mov     x9, PARTICLE_TYPE_SPARK
         str     x9, [x10, PS_PARTICLE_TYPE]
-        str     x1, [x10, PS_POS_X]
-        str     x2, [x10, PS_POS_Y]
-        str     x3, [x10, PS_SIZE]
-        str     w4, [x10, PS_COLOR]
-        str     x5, [x10, PS_PHASE]
-        str     x6, [x10, PS_FREQUENCY]
+        str     x1, [x10, PSSTAR_POS_X]
+        str     x2, [x10, PSSTAR_POS_Y]
+        str     x3, [x10, PSSTAR_SIZE]
+        str     w4, [x10, PSSTAR_COLOR]
+        str     x5, [x10, PSSTAR_PHASE]
+        str     x6, [x10, PSSTAR_FREQUENCY]
 
         bl      get_time
-        str     w0, [x10, PS_TIMESTAMP]
+        str     w0, [x10, PSSTAR_TIMESTAMP]
 
 
 particle_manager_create_spark__end:
@@ -353,7 +359,7 @@ particle_spark_update:
         stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
 
-        ldr     w0, [x0, PS_TIMESTAMP]
+        ldr     w0, [x0, PSSTAR_TIMESTAMP]
         bl      get_elapsed_time
         ldr     x9, =(1500 * 1000)
         cmp     x0, x9
@@ -377,19 +383,19 @@ particle_spark_draw:
         mov     x20, x0         // x20 <- particle state
         mov     x21, x1         // x21 <- framebuffer
 
-        ldr     w0, [x20, PS_TIMESTAMP]
+        ldr     w0, [x20, PSSTAR_TIMESTAMP]
         bl      get_elapsed_time
         lsl     x0, x0, 16              // x0 <- time in us             (Q16)
         ldr     x9, =US_PER_SECOND
         udiv    x0, x0, x9              // x0 <- time in seconds        (Q16)
 
         // orr     x1, xzr, 4 << 32        // x1 <- amplitude
-        // ldr     x2, [x20, PS_FREQUENCY] // x2 <- frequency
-        // ldr     x3, [x20, PS_PHASE]     // x3 <- phase
+        // ldr     x2, [x20, PSSTAR_FREQUENCY] // x2 <- frequency
+        // ldr     x3, [x20, PSSTAR_PHASE]     // x3 <- phase
         // bl      sine_wave_advanced
 
-        ldr     x9, [x20, PS_FREQUENCY]         // x9 <- velocity x      (Q32)
-        ldr     x10, [x20, PS_PHASE]            // x10 <- velocity y     (Q32)
+        ldr     x9, [x20, PSSTAR_FREQUENCY]         // x9 <- velocity x      (Q32)
+        ldr     x10, [x20, PSSTAR_PHASE]            // x10 <- velocity y     (Q32)
         asr     x9, x9, 16                      // x9 <- velocity x      (Q16)
         asr     x10, x10, 16                    // x10 <- velocity y     (Q16)
 
@@ -398,13 +404,13 @@ particle_spark_draw:
         q32_to_int x2, x2, x9   // x2 <- delta x
         q32_to_int x3, x3, x9   // x3 <- delta y
 
-        ldr     x0, [x20, PS_POS_X]
-        ldr     x1, [x20, PS_POS_Y]
+        ldr     x0, [x20, PSSTAR_POS_X]
+        ldr     x1, [x20, PSSTAR_POS_Y]
         add     x2, x0, x2      // x2 <- end x coordinate
         add     x3, x1, x3      // x3 <- end y coordinate
 
         mov     x4, x21
-        ldr     w5, [x20, PS_COLOR]
+        ldr     w5, [x20, PSSTAR_COLOR]
         bl      draw_line
 
         ldp     x20, x21, [sp, 16]
