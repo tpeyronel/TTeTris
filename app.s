@@ -243,22 +243,28 @@ game_loop__dont_update:
         mov     x10, x0         // x10 <- y pos
 
         mov     x0, 0
-        mov     x1, 1 << 8
+        mov     x1, 1 << 10
         bl      rand_gen_in_range
-        sub     x0, x0, 1 << 7
+        sub     x0, x0, 1 << 9
         lsl     x11, x0, 32     // x11 <- velocity x
 
         mov     x0, 0
-        mov     x1, 1 << 8
+        mov     x1, 1 << 10
         bl      rand_gen_in_range
-        sub     x0, x0, 1 << 7
+        sub     x0, x0, 1 << 9
         lsl     x12, x0, 32     // x12 <- velocity y
+
+        mov     x0, 100
+        mov     x1, 250
+        bl      rand_gen_in_range
+        mov     x13, 1000
+        mul     x13, x0, x13    // x13 <- duration
 
         add     x0, sp, PARTICLE_MANAGER
         mov     x1, x9
         mov     x2, x10
-        mov     x3, 123
-        ldr     x4, =0xFFFFFFFF
+        ldr     w3, =0xFFFFFFFF
+        mov     x4, x13
         mov     x5, x11
         mov     x6, x12
         bl      particle_manager_create_spark

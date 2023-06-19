@@ -29,7 +29,8 @@ PARTICLE_S:
         .equ PSSPARK_COLOR,             PSSPARK_TIMESTAMP + 4           // u32
         .equ PSSPARK_POS_X,             PSSPARK_COLOR + 4               // u64
         .equ PSSPARK_POS_Y,             PSSPARK_POS_X + 8               // u64
-        .equ PSSPARK_VELOCITY_X,        PSSPARK_POS_Y + 8               // u64 (Q32)
+        .equ PSSPARK_DURATION,          PSSPARK_POS_Y + 8               // u64 <- duration in us
+        .equ PSSPARK_VELOCITY_X,        PSSPARK_DURATION + 8            // u64 (Q32)
         .equ PSSPARK_VELOCITY_Y,        PSSPARK_VELOCITY_X + 8          // u64 (Q32)
 
 /* struct ParticleManager */
@@ -306,8 +307,8 @@ particle_star_draw:
  *      x0: in/out struct ParticleManager*
  *      x1: u64                                 <- x coordinate
  *      x2: u64                                 <- y coordinate
- *      x3: u64                                 <- size
- *      w4: u32                                 <- color
+ *      w3: u32                                 <- color
+ *      x4: u64                                 <- duration
  *      x5: u64                                 <- velocity x (Q32)
  *      x6: u64                                 <- velocity y (Q32)
  */
@@ -331,15 +332,15 @@ particle_manager_create_spark:
 
         mov     x9, PARTICLE_TYPE_SPARK
         str     x9, [x10, PS_PARTICLE_TYPE]
-        str     x1, [x10, PSSTAR_POS_X]
-        str     x2, [x10, PSSTAR_POS_Y]
-        str     x3, [x10, PSSTAR_SIZE]
-        str     w4, [x10, PSSTAR_COLOR]
-        str     x5, [x10, PSSTAR_PHASE]
-        str     x6, [x10, PSSTAR_FREQUENCY]
+        str     x1, [x10, PSSPARK_POS_X]
+        str     x2, [x10, PSSPARK_POS_Y]
+        str     w3, [x10, PSSPARK_COLOR]
+        str     x4, [x10, PSSPARK_DURATION]
+        str     x5, [x10, PSSPARK_VELOCITY_X]
+        str     x6, [x10, PSSPARK_VELOCITY_Y]
 
         bl      get_time
-        str     w0, [x10, PSSTAR_TIMESTAMP]
+        str     w0, [x10, PSSPARK_TIMESTAMP]
 
 
 particle_manager_create_spark__end:
@@ -359,9 +360,11 @@ particle_spark_update:
         stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
 
-        ldr     w0, [x0, PSSTAR_TIMESTAMP]
+        mov     x19, x0
+
+        ldr     w0, [x19, PSSPARK_TIMESTAMP]
         bl      get_elapsed_time
-        ldr     x9, =(1500 * 1000)
+        ldr     x9, [x19, PSSPARK_DURATION]
         cmp     x0, x9
         cset    x0, lt
 
@@ -383,7 +386,7 @@ particle_spark_draw:
         mov     x20, x0         // x20 <- particle state
         mov     x21, x1         // x21 <- framebuffer
 
-        ldr     w0, [x20, PSSTAR_TIMESTAMP]
+        ldr     w0, [x20, PSSPARK_TIMESTAMP]
         bl      get_elapsed_time
         lsl     x0, x0, 16              // x0 <- time in us             (Q16)
         ldr     x9, =US_PER_SECOND
@@ -394,8 +397,8 @@ particle_spark_draw:
         // ldr     x3, [x20, PSSTAR_PHASE]     // x3 <- phase
         // bl      sine_wave_advanced
 
-        ldr     x9, [x20, PSSTAR_FREQUENCY]         // x9 <- velocity x      (Q32)
-        ldr     x10, [x20, PSSTAR_PHASE]            // x10 <- velocity y     (Q32)
+        ldr     x9, [x20, PSSPARK_VELOCITY_X]         // x9 <- velocity x      (Q32)
+        ldr     x10, [x20, PSSPARK_VELOCITY_Y]        // x10 <- velocity y     (Q32)
         asr     x9, x9, 16                      // x9 <- velocity x      (Q16)
         asr     x10, x10, 16                    // x10 <- velocity y     (Q16)
 
@@ -404,13 +407,13 @@ particle_spark_draw:
         q32_to_int x2, x2, x9   // x2 <- delta x
         q32_to_int x3, x3, x9   // x3 <- delta y
 
-        ldr     x0, [x20, PSSTAR_POS_X]
-        ldr     x1, [x20, PSSTAR_POS_Y]
+        ldr     x0, [x20, PSSPARK_POS_X]
+        ldr     x1, [x20, PSSPARK_POS_Y]
         add     x2, x0, x2      // x2 <- end x coordinate
         add     x3, x1, x3      // x3 <- end y coordinate
 
         mov     x4, x21
-        ldr     w5, [x20, PSSTAR_COLOR]
+        ldr     w5, [x20, PSSPARK_COLOR]
         bl      draw_line
 
         ldp     x20, x21, [sp, 16]
