@@ -33,11 +33,11 @@
         .equ GPIO_BASE,                 0x3f200000
         .equ GPIO_GPFSEL0,              0x00
         .equ GPIO_GPLEV0,               0x34
-        .equ GPIO_W,                    0b000010        // (GPIO_1)
-        .equ GPIO_A,                    0b000100        // (GPIO_2)
-        .equ GPIO_S,                    0b001000        // (GPIO_3)
-        .equ GPIO_D,                    0b010000        // (GPIO_4)
-        .equ GPIO_SPACE,                0b100000        // (GPIO_5)
+        .equ GPIO_W,                    1 << 1          // (GPIO_1)
+        .equ GPIO_A,                    1 << 2          // (GPIO_2)
+        .equ GPIO_S,                    1 << 3          // (GPIO_3)
+        .equ GPIO_D,                    1 << 4          // (GPIO_4)
+        .equ GPIO_SPACE,                1 << 5          // (GPIO_5)
         .equ MS_PER_STEP,               250
         .equ US_PER_STEP,               MS_PER_STEP * 1000
 
