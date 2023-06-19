@@ -6,6 +6,8 @@ PARTICLE_S:
         .include "./util.s"
         .include "./fixed_point.s"
         .include "./line.s"
+        .include "./rand.s"
+        .include "./tetris_cell.s"
 
         .equ MAX_PARTICLES,     256
 
@@ -395,7 +397,7 @@ particle_spark_draw:
         sub     x0, x10, x9             // x0 <- 1 - stage
         lsl     x0, x0, 1               // x0 <- 2 * (1 - stage)
         bl      smooth_step             // x0 <- alpha multiplier       (Q32)
-        mov     x9, 0x7F
+        mov     x9, 0xFF
         mul     x9, x0, x9              // x9 <- alpha                  (Q32)
         lsr     x9, x9, 32              // x9 <- alpha
         ldr     w19, [x20, PSSPARK_COLOR]
@@ -403,6 +405,8 @@ particle_spark_draw:
         bfi     w19, w9, 16, 8
         bfi     w19, w9, 8, 8
         bfi     w19, w9, 0, 8
+        mov     x9, 0xFF
+        bfi     w19, w9, 24, 8
 
 
 
@@ -431,12 +435,12 @@ particle_spark_draw:
 
         ldr     x0, [x20, PSSPARK_POS_X]
         ldr     x1, [x20, PSSPARK_POS_Y]
-        add     x2, x0, x2      // x2 <- end x coordinate
-        add     x3, x1, x3      // x3 <- end y coordinate
+        add     x0, x0, x2      // x2 <- end x coordinate
+        add     x1, x1, x3      // x3 <- end y coordinate
 
-        mov     x4, x21
-        mov     w5, w19
-        bl      draw_line
+        mov     x2, x21
+        mov     w3, w19
+        bl      draw_argb_pixel_at
 
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
@@ -444,6 +448,60 @@ particle_spark_draw:
 
 
 
+/*
+ * Params:
+ *      x0: u64                                 <- left x coordinate
+ *      x1: u64                                 <- y coordinate
+ *      x2: in/out struct ParticleManager*      <- particle manager
+ */
+create_spark_cluster:
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+
+        mov     x20, x0
+        mov     x21, x1
+        mov     x19, x2
+
+        mov     x25, 64
+
+create_spark_cluster__next:
+        mov     x0, 0
+        mov     x1, TETRIS_CELL_SIZE
+        bl      rand_gen_in_range
+        add     x22, x20, x0    // x22 <- spark x pos
+
+        sub     x9, x0, (TETRIS_CELL_SIZE / 2)
+        bl      rand_gen_fixedp // x0 <- [0.0, 1.0)
+        mul     x23, x0, x9     // x23 <- velocity x
+        mov     x9, 15
+        mul     x23, x23, x9
+
+        bl      rand_gen_fixedp
+        mov     x9, 1 << 31
+        sub     x0, x0, x9      // x0 <- [-0.5, 0.5)
+        mov     x9, 150
+        mul     x24, x0, x9     // x24 <- [-5.0, 5.0) <- velocity y
+
+        mov     x0, x19
+        mov     x1, x22
+        mov     x2, x21
+        ldr     w3, =0xFFFFFF
+        ldr     x4, =(1000 * 1000)
+        mov     x5, x23
+        mov     x6, x24
+        bl      particle_manager_create_spark
+
+        sub     x25, x25, 1
+        cbnz    x25, create_spark_cluster__next
+
+
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
+        ret
 
 
 

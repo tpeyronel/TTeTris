@@ -29,4 +29,16 @@ rand_gen_in_range:
         ret
 
 
+
+/*
+ * Returns:
+ *      x0: u64 (Q32)           <- random number in range [0.0, 1.0)
+ */
+rand_gen_fixedp:
+        ldr     x0, =RNG_NUMBER_ADDRESS
+        ldr     w0, [x0]              // w0 <- random number in range [0.0, 1.0)        (Q32)
+        ret
+
+
+
 .endif

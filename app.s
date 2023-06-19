@@ -228,9 +228,9 @@ game_loop__dont_update:
 
 
         mov     x0, 0
-        mov     x1, 256
+        mov     x1, 32
         bl      rand_gen_in_range
-        cbz     x0, game_loop__end_new_spark
+        cbnz    x0, game_loop__end_new_spark
 
         mov     x0, 0
         mov     x1, SCREEN_WIDTH
@@ -267,7 +267,12 @@ game_loop__dont_update:
         mov     x4, x13
         mov     x5, x11
         mov     x6, x12
-        bl      particle_manager_create_spark
+        // bl      particle_manager_create_spark
+
+        mov     x0, x9
+        mov     x1, x10
+        add     x2, sp, PARTICLE_MANAGER
+        bl      create_spark_cluster
 game_loop__end_new_spark:
 
 
