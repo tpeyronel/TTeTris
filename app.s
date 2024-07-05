@@ -105,7 +105,8 @@
         .equ LAST_FRAME,                AVG_FRAMETIME + 4                               // u32
         .equ LAST_TICK,                 LAST_FRAME + 4                                  // u32
         .equ LAST_DROP,                 LAST_TICK + 4                                   // u32
-        .equ TICK_COUNTER,              LAST_DROP + 4                                   // u64
+        .equ TICK_TIME_ACCUMULATOR,     LAST_DROP + 4                                   // u32
+        .equ TICK_COUNTER,              TICK_TIME_ACCUMULATOR + 4                       // u64
         .equ HELD_PIECE_ID,             TICK_COUNTER + 8                                // u64 <- 0 or tetromino id with bias
         .equ CONSUMED_SWAP,             HELD_PIECE_ID + 8                               // bool (u64)
         .equ GAME_STATS,                CONSUMED_SWAP + 8                               // struct GameStats
@@ -205,6 +206,14 @@ main:
  * ************* *
  */
 game_loop:
+        ldr     w0, [sp, LAST_TICK]
+        bl      get_elapsed_time
+        mov     w2, US_PER_TICK
+        cmp     w0, w2          // Check if enough time has passed since last sleep
+        b.lt    game_loop__skip_update
+        ldr     w0, [sp, LAST_TICK]
+        add     w0, w0, w2      // Move LAST_TICK by US_PER_TICK
+        str     w0, [sp, LAST_TICK]
 
         add     x0, sp, INPUT_STATE
         bl      read_input
@@ -224,9 +233,6 @@ game_loop:
         str     x9, [sp, IS_PAUSED]
 game_loop__not_game_over:
 game_loop__dont_update:
-
-        mov     x0, x28
-        bl      draw_canvas
 
 
         mov     x0, 0
@@ -277,16 +283,22 @@ game_loop__dont_update:
         bl      create_spark_cluster
 game_loop__end_new_spark:
 
+        /* Increment TICK_COUNTER by 1 (after updating, just in case) */
+        ldr     x0, [sp, TICK_COUNTER]
+        add     x0, x0, 1
+        str     x0, [sp, TICK_COUNTER]
 
-
+game_loop__skip_update:
+        /* particle_manager.update() is not logic related, so it is fine to always call it */
         add     x0, sp, PARTICLE_MANAGER
         bl      particle_manager_update
 
+        mov     x0, x28
+        bl      draw_canvas
 
         add     x0, sp, PARTICLE_MANAGER
         mov     x1, x28
         bl      particle_manager_render
-
 
         mov     x0, ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * ((BOARD_WIDTH / 2) + 1)))
         mov     x1, ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * ((BOARD_HEIGHT / 2) + 1)))
@@ -311,7 +323,6 @@ game_loop__end_new_spark:
         bl      draw_tetromino_at
 game_loop__skip_held_piece:
 
-
         mov     x0, (SCREEN_WIDTH - 1)
         sub     x0, x0, x19
         mov     x1, x19
@@ -319,11 +330,9 @@ game_loop__skip_held_piece:
         mov     x3, x28
         bl      draw_stats
 
-
         mov     x0, sp
         mov     x1, x28
         bl      draw_destroy_particles
-
 
         mov     x0, 120
         mov     x1, 80
@@ -348,21 +357,6 @@ game_loop__skip_held_piece:
         mov     x0, sp
         bl      update_frametime
 
-game_loop__sleep:
-        ldr     w0, [sp, LAST_TICK]
-        bl      get_elapsed_time
-        mov     w2, US_PER_TICK
-        cmp     w0, w2
-        b.lt    game_loop__sleep
-
-
-        ldr     w0, [sp, LAST_TICK]
-        add     w0, w0, w2
-        str     w0, [sp, LAST_TICK]
-
-        ldr     x0, [sp, TICK_COUNTER]
-        add     x0, x0, 1
-        str     x0, [sp, TICK_COUNTER]
         b game_loop
 
 
@@ -1133,7 +1127,7 @@ draw_fps:
         stp     lr, x19, [sp, -16]!
         sub     sp, sp, STRUCT_DNI_SIZE
 
-        mov     x9, 120
+        mov     x9, 80
         str     x9, [sp, DNI_POS_X]
         mov     x9, 12
         str     x9, [sp, DNI_POS_Y]
@@ -1149,13 +1143,13 @@ draw_fps:
         mov     x9, 5
         str     x9, [sp, DNI_MAX_DIGITS]
 
-        mov     x9, 48
+        mov     x9, 20
         str     x9, [sp, DNI_DIGIT_WIDTH]
 
-        mov     x9, 12
+        mov     x9, 6
         str     x9, [sp, DNI_DIGIT_THICKNESS]
 
-        mov     x9, 12
+        mov     x9, 6
         str     x9, [sp, DNI_DIGIT_SPACING]
 
         ldr     w9, =0xFFFFFFFF
