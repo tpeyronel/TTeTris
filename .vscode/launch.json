@@ -1,0 +1,31 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "attach",
+            "name": "Debug QEMU",
+            "gdbpath": "/usr/bin/gdb-multiarch",
+            "target": "localhost:1234",
+            "remote": true,
+            "printCalls": true,
+            "debugger_args": [
+                "-ex",
+                "set architecture aarch64",
+                "-ex",
+                "set confirm off",
+                "-ex",
+                "add-symbol-file app.o 0x900c8",
+                "-ex",
+                "set confirm on",
+            ],
+            "preLaunchTask": "Launch QEMU (debug)",
+            "postDebugTask": "Stop QEMU",
+            "cwd": "${workspaceRoot}",
+            "valuesFormatting": "parseText"
+        },
+    ]
+}

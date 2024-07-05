@@ -1,0 +1,46 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Launch QEMU (debug)",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "debugQEMU"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    // "beginsPattern": "Compiling...",
+                    // Ensures that browser is only opened after the task is completed.
+                    // "endsPattern": "Compiled .*"
+                    "beginsPattern": "rm .*",
+                    "endsPattern": "qemu-system-aarch64 .*"
+                }
+            }
+        },
+        {
+            "label": "Stop QEMU",
+            // "command": "echo ${input:terminate}",
+            "command": "pkill",
+            "args": ["-f", "qemu-system-aarch64"],
+            "type": "shell",
+            // "command": "${command:workbench.action.terminal.kill}",
+            // "type": "process",
+            // "args": ["terminateAll"],
+            "problemMatcher": []
+        }
+    ],
+    // "inputs": [
+    //     {
+    //         "id": "terminate",
+    //         "type": "command",
+    //         "command": "workbench.action.tasks.terminate",
+    //         "args": "terminateAll"
+    //     }
+    // ]
+}

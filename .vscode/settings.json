@@ -1,0 +1,8 @@
+{
+    "files.exclude": {
+        "*.pdn": true,
+        "*.o": true,
+        "kernel8.*": true,
+        "memory_map.txt": true,
+    }
+}
