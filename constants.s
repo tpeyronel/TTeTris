@@ -28,6 +28,9 @@ CONSTANTS_S:
         .equ TETROMINO_ORIGIN_X,                (BOARD_WIDTH / 2) - (TETROMINO_BOARD_WIDTH / 2)
         .equ TETROMINO_ORIGIN_Y,                BOARD_HEIGHT - TETROMINO_BOARD_HEIGHT
 
+        .equ F32_0_9,            0x3f666666      // 0.9f32
+        .equ F32_1000000,        0x49742400      // 1_000_000.0f32
+
 
 /* struct Tetromino */
         .equ TETROMINO_DIFFUSE_COLOR,   0                               // u32

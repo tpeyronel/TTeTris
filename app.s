@@ -101,7 +101,9 @@
 
 /* struct GameState */
         .equ IS_PAUSED,                 0                                               // bool (u64)
-        .equ LAST_TICK,                 IS_PAUSED + 8                                   // u32
+        .equ AVG_FRAMETIME,             IS_PAUSED + 8                                   // f32 <- average frame time in microseconds
+        .equ LAST_FRAME,                AVG_FRAMETIME + 4                               // u32
+        .equ LAST_TICK,                 LAST_FRAME + 4                                  // u32
         .equ LAST_DROP,                 LAST_TICK + 4                                   // u32
         .equ TICK_COUNTER,              LAST_DROP + 4                                   // u64
         .equ HELD_PIECE_ID,             TICK_COUNTER + 8                                // u64 <- 0 or tetromino id with bias
@@ -333,7 +335,9 @@ game_loop__skip_held_piece:
         mov     x7, x28
         bl      draw_triangle_barycentric
 
-
+        mov     x0, sp
+        mov     x1, x28
+        bl      draw_fps
 
         /* Copy back buffer to real framebuffer */
         mov     x0, x28
@@ -341,6 +345,8 @@ game_loop__skip_held_piece:
         ldr     x1, [sp, x9]                    // restore original framebuffer address from stack
         bl      copy_framebuffer
 
+        mov     x0, sp
+        bl      update_frametime
 
 game_loop__sleep:
         ldr     w0, [sp, LAST_TICK]
@@ -421,8 +427,10 @@ init_game_state:
         mov     x19, x0                 // x19 <- game_state
 
         str     xzr, [x19, IS_PAUSED]
+        str     wzr, [x19, AVG_FRAMETIME]
 
         bl      get_time
+        str     w0, [x19, LAST_FRAME]
         str     w0, [x19, LAST_TICK]
         str     w0, [x19, LAST_DROP]
 
@@ -1113,6 +1121,81 @@ draw_destroy_particles__end:
         ldur    x19, [sp, 8]
         ldur    lr, [sp]
         add     sp, sp, 72
+        ret
+
+
+/*
+ * Params:
+ *      x0: in struct GameState*
+ *      x1: out u32*                    <- framebuffer
+ */
+draw_fps:
+        stp     lr, x19, [sp, -16]!
+        sub     sp, sp, STRUCT_DNI_SIZE
+
+        mov     x9, 120
+        str     x9, [sp, DNI_POS_X]
+        mov     x9, 12
+        str     x9, [sp, DNI_POS_Y]
+
+        ldr     s0, [x0, AVG_FRAMETIME] // s0 = frametime in microseconds
+        ldr     s1, =F32_1000000
+        fdiv    s0, s0, s1              // s0 = frametime in seconds
+        fmov    s1, 1
+        fdiv    s0, s1, s0              // s0 = framerate
+        fcvtnu  x9, s0                  // x19 = (u32)(framerate)
+        str     x9, [sp, DNI_VALUE]
+
+        mov     x9, 5
+        str     x9, [sp, DNI_MAX_DIGITS]
+
+        mov     x9, 48
+        str     x9, [sp, DNI_DIGIT_WIDTH]
+
+        mov     x9, 12
+        str     x9, [sp, DNI_DIGIT_THICKNESS]
+
+        mov     x9, 12
+        str     x9, [sp, DNI_DIGIT_SPACING]
+
+        ldr     w9, =0xFFFFFFFF
+        str     w9, [sp, DNI_COLOR]
+
+        mov     x0, sp
+        mov     x1, x1
+        bl      draw_number
+
+        add     sp, sp, STRUCT_DNI_SIZE
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out struct GameState*
+ */
+update_frametime:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x0                         // x19 <- game_state
+
+        ldr     w0, [x19, LAST_FRAME]
+        bl      get_elapsed_time
+        str     w1, [x19, LAST_FRAME]
+
+        ldr     s0, [x19, AVG_FRAMETIME]        // s0 = AvgFrametime
+        ldr     s1, =F32_0_9                    // s1 = 0.9
+        fmul    s0, s0, s1                      // AvgFrametime *= 0.9
+
+        fmov    s2, 1
+        fsub    s1, s2, s1                      // s1 = 1 - s1
+        ucvtf   s2, w0                          // s2 = (float)(frametime)
+        fmadd   s0, s2, s1, s0                  // AvgFrametime += 0.1 * Frametime
+
+        str     s0, [x19, AVG_FRAMETIME]
+
+        ldp     lr, x19, [sp], 16
         ret
 
 
