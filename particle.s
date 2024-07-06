@@ -446,27 +446,31 @@ particle_spark_draw:
  * Params:
  *      x0: u64                                 <- left x coordinate
  *      x1: u64                                 <- y coordinate
- *      x2: in/out struct ParticleManager*      <- particle manager
+ *      x2: u64                                 <- cluster width
+ *      x3: in/out struct ParticleManager*      <- particle manager
  */
 create_spark_cluster:
-        stp     lr, x19, [sp, -64]!
-        stp     x20, x21, [sp, 16]
-        stp     x22, x23, [sp, 32]
-        stp     x24, x25, [sp, 48]
+        stp     lr, x19, [sp, -16]!
+        stp     x20, x21, [sp, -16]!
+        stp     x22, x23, [sp, -16]!
+        stp     x24, x25, [sp, -16]!
+        stp     x26, x27, [sp, -16]!
 
         mov     x20, x0
         mov     x21, x1
-        mov     x19, x2
+        mov     x26, x2
+        mov     x19, x3
 
         mov     x25, 64
 
 create_spark_cluster__next:
         mov     x0, 0
-        mov     x1, TETRIS_CELL_SIZE
+        mov     x1, x26
         bl      rand_gen_in_range
         add     x22, x20, x0    // x22 <- spark x pos
 
-        sub     x9, x0, (TETRIS_CELL_SIZE / 2)
+        lsr     x9, x26, 1      // x9 <- cluster width / 2
+        sub     x9, x0, x9
         bl      rand_gen_fixedp // x0 <- [0.0, 1.0)
         mul     x23, x0, x9     // x23 <- velocity x
         mov     x9, 15
@@ -491,10 +495,11 @@ create_spark_cluster__next:
         cbnz    x25, create_spark_cluster__next
 
 
-        ldp     x24, x25, [sp, 48]
-        ldp     x22, x23, [sp, 32]
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 64
+        ldp     x26, x27, [sp], 16
+        ldp     x24, x25, [sp], 16
+        ldp     x22, x23, [sp], 16
+        ldp     x20, x21, [sp], 16
+        ldp     lr, x19, [sp], 16
         ret
 
 

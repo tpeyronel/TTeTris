@@ -279,7 +279,8 @@ game_loop__dont_update:
 
         mov     x0, x9
         mov     x1, x10
-        add     x2, sp, PARTICLE_MANAGER
+        mov     x2, (3 * TETRIS_CELL_SIZE)
+        add     x3, sp, PARTICLE_MANAGER
         bl      create_spark_cluster
 game_loop__end_new_spark:
 
