@@ -411,12 +411,6 @@ particle_spark_draw:
 
 
 
-        orr     x1, xzr, 4 << 32        // x1 <- amplitude
-        ldr     x2, [x20, PSSTAR_FREQUENCY] // x2 <- frequency
-        ldr     x3, [x20, PSSTAR_PHASE]     // x3 <- phase
-        bl      sine_wave_advanced
-
-
         ldr     w0, [x20, PSSPARK_TIMESTAMP]
         bl      get_elapsed_time
         lsl     x0, x0, 16              // x0 <- elapsed time in us     (Q16)
