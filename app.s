@@ -1133,7 +1133,7 @@ draw_fps:
         str     x9, [sp, DNI_POS_Y]
 
         ldr     s0, [x0, AVG_FRAMETIME] // s0 = frametime in microseconds
-        ldr     s1, =F32_1000000
+        ldr     s1, f32_1000000
         fdiv    s0, s0, s1              // s0 = frametime in seconds
         fmov    s1, 1
         fdiv    s0, s1, s0              // s0 = framerate
@@ -1179,7 +1179,7 @@ update_frametime:
         str     w1, [x19, LAST_FRAME]
 
         ldr     s0, [x19, AVG_FRAMETIME]        // s0 = AvgFrametime
-        ldr     s1, =F32_0_9                    // s1 = 0.9
+        ldr     s1, f32_0_9                     // s1 = 0.9
         fmul    s0, s0, s1                      // AvgFrametime *= 0.9
 
         fmov    s2, 1
