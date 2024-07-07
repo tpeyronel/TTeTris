@@ -277,11 +277,11 @@ game_loop__dont_update:
         mov     x6, x12
         // bl      particle_manager_create_spark
 
-        mov     x0, x9
-        mov     x1, x10
-        mov     x2, (3 * TETRIS_CELL_SIZE)
-        add     x3, sp, PARTICLE_MANAGER
-        bl      create_spark_cluster
+        // mov     x0, x9
+        // mov     x1, x10
+        // mov     x2, (1 * TETRIS_CELL_SIZE)
+        // add     x3, sp, PARTICLE_MANAGER
+        // bl      create_spark_cluster
 game_loop__end_new_spark:
 
         /* Increment TICK_COUNTER by 1 (after updating, just in case) */
@@ -297,10 +297,6 @@ game_loop__skip_update:
         mov     x0, x28
         bl      draw_canvas
 
-        add     x0, sp, PARTICLE_MANAGER
-        mov     x1, x28
-        bl      particle_manager_render
-
         mov     x0, BOARD_ORIGIN_X
         mov     x1, BOARD_ORIGIN_Y
         mov     x19, x1
@@ -308,6 +304,10 @@ game_loop__skip_update:
         add     x3, sp, TETROMINO_STATE
         mov     x4, x28
         bl      draw_board
+
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, x28
+        bl      particle_manager_render
 
         mov     x0, 64
         mov     x1, 64
@@ -1533,6 +1533,7 @@ do_hard_drop:
 
         add     x0, x19, TETROMINO_STATE
         add     x1, x19, BOARD_STATE
+        add     x2, x19, PARTICLE_MANAGER
         bl      try_place_tetromino_and_update
         cbnz    x0, do_hard_drop__end
 
@@ -1667,6 +1668,7 @@ tetromino_fall:
         // Try to integrate tetromino with board, if not possible, then GAME OVER.
         add     x0, x19, TETROMINO_STATE
         add     x1, x19, BOARD_STATE
+        add     x2, x19, PARTICLE_MANAGER
         bl      try_place_tetromino_and_update
         b       tetromino_fall__end     // Return result of call above
 
@@ -1865,15 +1867,18 @@ try_place_tetromino__end:
  * Params:
  *      x0: in struct TetrominoState*
  *      x1: in/out struct BoardState*
+ *      x2: in/out struct ParticleManager*
  * Returns:
  *      x0: bool
  */
 try_place_tetromino_and_update:
-        stp     lr, x19, [sp, -32]!
-        stp     x20, x21, [sp, 16]
+        stp     lr, x19, [sp, -16]!
+        stp     x20, x21, [sp, -16]!
+        stp     x22, x23, [sp, -16]!
 
         mov     x20, x0         // x20 <- tetromino state
         mov     x21, x1         // x21 <- board state
+        mov     x22, x2         // x22 <- particle manager
 
         mov     x0, x20
         mov     x1, x21
@@ -1881,6 +1886,11 @@ try_place_tetromino_and_update:
         cbz     x0, try_place_tetromino_and_update__end // Return 0 if try_place failed
 
         /* We successfully placed tetromino, so update the board and spawn a new one */
+
+        mov     x0, x20
+        mov     x1, x21
+        mov     x2, x22
+        bl      spawn_placement_particles
 
         add     x0, x19, BOARD_STATE
         add     x1, x19, (TETROMINO_STATE + TSTATE_POS_Y)
@@ -1906,8 +1916,157 @@ try_place_tetromino_and_update:
         mov     x0, 1           // Return success
 
 try_place_tetromino_and_update__end:
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 32
+        ldp     x22, x23, [sp], 16
+        ldp     x20, x21, [sp], 16
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in struct TetrominoState*
+ *      x1: in/out struct BoardState*
+ *      x2: in/out struct ParticleManager*
+ */
+spawn_placement_particles:
+        stp     lr, x19, [sp, -16]!
+        stp     x20, x21, [sp, -16]!
+        stp     x22, x23, [sp, -16]!
+        stp     x24, x25, [sp, -16]!
+        stp     x26, x27, [sp, -16]!
+
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- board state
+        mov     x22, x2         // x22 <- particle manager
+
+
+        mov     x19, 0          // x19 <- current column (from tetromino position, left to right)
+        mov     x24, -1         // x24 <- collision edge row, relative to tetromino origin (so 0 <= x24 < TETROMINO_BOARD_HEIGHT)
+        mov     x25, 0          // x25 <- collision edge width
+
+        spawn_placement_particles__next:
+                mov     x0, x20
+                mov     x1, x19
+                bl      get_lowest_tetromino_cell_at_column
+                mov     x26, x0         // x26 <- this column's lowest cell, or -1
+
+                // Check if this column actually has any cells
+                cmp     x26, xzr
+                b.lt    spawn_placement_particles__flush_edge // If not, then flush the previous edge (if any)
+
+                // Check if we should extend the edge instead of flushing it
+                cmp     x26, x24
+                b.eq    spawn_placement_particles__extend_edge
+
+                spawn_placement_particles__flush_edge:
+                // Check if there actually is a previous edge to flush (ie, draw)
+                cmp     x25, xzr
+                b.eq    spawn_placement_particles__start_edge
+
+                ldr     x0, [x20, TSTATE_POS_X]
+                add     x0, x0, x19                     // x0 <- current column in board space
+                sub     x0, x0, x25                     // x0 <- start column (in board space) of collision edge
+                mov     x9, TETRIS_CELL_SIZE
+                mul     x0, x0, x9
+                add     x0, x0, INNER_BOARD_ORIGIN_X
+                ldr     x1, [x20, TSTATE_POS_Y]
+                add     x1, x1, x24
+                mul     x1, x1, x9                      // x1 <- collision edge row * tetris cell size
+                add     x1, x1, INNER_BOARD_ORIGIN_Y    // x1 <- inner board origin y + (collision edge row * tetris cell size)
+                mul     x2, x25, x9                     // x2 <- collision edge width * tetris cell size
+                mov     x3, x22
+                bl      create_spark_cluster
+                /* (falls down) */
+
+                spawn_placement_particles__start_edge:
+                mov     x24, x26                        // x24 <- new edge's row
+                cmp     x24, xzr
+                cset    x25, ge                         // x25 <- new edge's width. It should be 1 iff x24 is not -1 (ie, x24 >= 0).
+                b       spawn_placement_particles__continue
+
+                spawn_placement_particles__extend_edge:
+                add     x25, x25, 1
+                /* (falls down) */
+
+                spawn_placement_particles__continue:
+                add     x19, x19, 1
+                cmp     x19, TETROMINO_BOARD_WIDTH
+                b.lt    spawn_placement_particles__next
+
+        // Check if there is a "trailing" edge to flush.
+        cmp     xzr, x25
+        b.eq    spawn_placement_particles__no_trailing_edge
+
+        ldr     x0, [x20, TSTATE_POS_X]
+        add     x0, x0, x19                     // x0 <- current column in board space
+        sub     x0, x0, x25                     // x0 <- start column (in board space) of collision edge
+        mov     x9, TETRIS_CELL_SIZE
+        mul     x0, x0, x9
+        add     x0, x0, INNER_BOARD_ORIGIN_X
+        ldr     x1, [x20, TSTATE_POS_Y]
+        add     x1, x1, x24
+        mul     x1, x1, x9                      // x1 <- collision edge row * tetris cell size
+        add     x1, x1, INNER_BOARD_ORIGIN_Y    // x1 <- inner board origin y + (collision edge row * tetris cell size)
+        mul     x2, x25, x9                     // x2 <- collision edge width * tetris cell size
+        mov     x3, x22
+        bl      create_spark_cluster
+        spawn_placement_particles__no_trailing_edge:
+
+
+        ldp     x26, x27, [sp], 16
+        ldp     x24, x25, [sp], 16
+        ldp     x22, x23, [sp], 16
+        ldp     x20, x21, [sp], 16
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in struct TetrominoState*   <- tetromino state
+ *      x1: u32                         <- column (relative to tetromino)
+ * Returns:
+ *      x0: i32                         <- row of lowest cell, or -1
+ */
+get_lowest_tetromino_cell_at_column:
+        stp     lr, x19, [sp, -16]!
+        stp     x20, x21, [sp, -16]!
+        stp     x22, x23, [sp, -16]!
+
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- column we are interested in
+
+        mov     x0, x20
+        bl      get_tetromino
+        mov     x22, x0         // x22 <- tetromino data
+
+        mov     x19, 0          // x19 <- current row (from tetromino position, bottom to top)
+
+        get_lowest_tetromino_cell_at_column__next:
+                mov     x0, x21
+                mov     x1, x19
+                mov     x2, x22
+                bl      is_tetromino_cell_air   // x0 <- is current cell air
+                cbnz    x0, get_lowest_tetromino_cell_at_column__continue // current cell is air, go next
+                /* current cell is not air, so we found the lowest cell */
+                mov     x0, x19
+                b       get_lowest_tetromino_cell_at_column__exit
+
+                get_lowest_tetromino_cell_at_column__continue:
+                add     x19, x19, 1
+                cmp     x19, TETROMINO_BOARD_HEIGHT
+                b.lt    get_lowest_tetromino_cell_at_column__next
+
+        /* we traversed all the column and didn't find any non-air cell, return -1 */
+        mov     x0, -1
+
+        get_lowest_tetromino_cell_at_column__exit:
+
+        ldp     x22, x23, [sp], 16
+        ldp     x20, x21, [sp], 16
+        ldp     lr, x19, [sp], 16
         ret
 
 
