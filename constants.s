@@ -1,3 +1,4 @@
+.include "./tetris_cell.s"
 .ifndef CONSTANTS_S
 CONSTANTS_S:
 
@@ -27,6 +28,13 @@ CONSTANTS_S:
 
         .equ TETROMINO_ORIGIN_X,                (BOARD_WIDTH / 2) - (TETROMINO_BOARD_WIDTH / 2)
         .equ TETROMINO_ORIGIN_Y,                BOARD_HEIGHT - TETROMINO_BOARD_HEIGHT
+
+        // (origin = bottom left)
+        .equ BOARD_ORIGIN_X,                    ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * ((BOARD_WIDTH / 2) + 1)))
+        .equ BOARD_ORIGIN_Y,                    ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * ((BOARD_HEIGHT / 2) + 1)))
+        .equ INNER_BOARD_ORIGIN_X,              BOARD_ORIGIN_X + TETRIS_CELL_SIZE
+        .equ INNER_BOARD_ORIGIN_Y,              BOARD_ORIGIN_Y + TETRIS_CELL_SIZE
+
 
 f32_0_9:
         .float                  0.99

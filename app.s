@@ -301,8 +301,8 @@ game_loop__skip_update:
         mov     x1, x28
         bl      particle_manager_render
 
-        mov     x0, ((SCREEN_WIDTH / 2) - (TETRIS_CELL_SIZE * ((BOARD_WIDTH / 2) + 1)))
-        mov     x1, ((SCREEN_HEIGH / 2) - (TETRIS_CELL_SIZE * ((BOARD_HEIGHT / 2) + 1)))
+        mov     x0, BOARD_ORIGIN_X
+        mov     x1, BOARD_ORIGIN_Y
         mov     x19, x1
         add     x2, sp, BOARD_STATE
         add     x3, sp, TETROMINO_STATE
