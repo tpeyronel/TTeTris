@@ -15,10 +15,11 @@ PARTICLE_S:
 
 /* struct ParticleState */
         .equ PS_PARTICLE_TYPE,          0                               // u64
-        .equ PS_USER_DATA,              PS_PARTICLE_TYPE + 8            // size: MAX_STRUCT_PS_SIZE - 8
+        .equ PS_LAYER,                  PS_PARTICLE_TYPE + 8            // u64
+        .equ PS_USER_DATA,              PS_LAYER + 8                    // size: MAX_STRUCT_PS_SIZE - 8
 
 /* struct StarParticleState */
-        .equ PSSTAR_TIMESTAMP,          PS_PARTICLE_TYPE + 8            // u32
+        .equ PSSTAR_TIMESTAMP,          PS_LAYER + 8                    // u32
         .equ PSSTAR_COLOR,              PSSTAR_TIMESTAMP + 4            // u32
         .equ PSSTAR_POS_X,              PSSTAR_COLOR + 4                // u64
         .equ PSSTAR_POS_Y,              PSSTAR_POS_X + 8                // u64
@@ -27,7 +28,7 @@ PARTICLE_S:
         .equ PSSTAR_FREQUENCY,          PSSTAR_PHASE + 8                // u64 (Q32)
 
 /* struct SparkParticleState */
-        .equ PSSPARK_TIMESTAMP,         PS_PARTICLE_TYPE + 8            // u32
+        .equ PSSPARK_TIMESTAMP,         PS_LAYER + 8                    // u32
         .equ PSSPARK_COLOR,             PSSPARK_TIMESTAMP + 4           // u32
         .equ PSSPARK_POS_X,             PSSPARK_COLOR + 4               // u64
         .equ PSSPARK_POS_Y,             PSSPARK_POS_X + 8               // u64
@@ -113,6 +114,8 @@ particle_manager_create_star:
 
         mov     x9, PARTICLE_TYPE_STAR
         str     x9, [x10, PS_PARTICLE_TYPE]
+        mov     x9, 0
+        str     x9, [x10, PS_LAYER]
         str     x1, [x10, PSSTAR_POS_X]
         str     x2, [x10, PSSTAR_POS_Y]
         str     x3, [x10, PSSTAR_SIZE]
@@ -155,7 +158,7 @@ particle_state_copy__next_block:
 
 /*
  * Params:
- *      x0: in/out struct ParticleManager*  <- particle manager
+ *      x0: in/out struct ParticleManager*      <- particle manager
  */
 particle_manager_update:
         stp     lr, x19, [sp, -48]!
@@ -212,7 +215,8 @@ particle_manager_update__end:
 /*
  * Params:
  *      x0: in struct ParticleManager*  <- particle manager
- *      x1: out u32*                    <- framebuffer
+ *      x1: u32                         <- layer to render
+ *      x2: out u32*                    <- framebuffer
  */
 particle_manager_render:
         stp     lr, x19, [sp, -48]!
@@ -221,11 +225,17 @@ particle_manager_render:
 
         ldr     x19, [x0, PM_PARTICLE_COUNT]    // x19 <- remaining particles
         add     x20, x0, PM_PARTICLE_ARRAY      // x20 <- pointer to current particle
-        mov     x21, x1                         // x21 <- framebuffer
+        mov     x21, x2                         // x21 <- framebuffer
         ldr     x22, =PARTICLE_TYPES            // x22 <- pointer to global ParticleType array
+        mov     x23, x1                         // x23 <- layer to render
 
 particle_manager_render__next:
         cbz     x19, particle_manager_render__end       // Check if any particles remain to be drawn
+
+        /* Skip rendering if layer is not correct */
+        ldr     x9, [x20, PS_LAYER]
+        cmp     x9, x23
+        b.ne    particle_manager_render__skip
 
         ldr     x9, [x20, PS_PARTICLE_TYPE]
         lsl     x9, x9, STRUCT_PARTICLE_TYPE_SIZE_SHIFT
@@ -236,6 +246,7 @@ particle_manager_render__next:
         mov     x1, x21         // x1 <- framebuffer
         blr     x9              // Draw particle
 
+        particle_manager_render__skip:
         sub     x19, x19, 1                     // Decrement remaining particles
         add     x20, x20, MAX_STRUCT_PS_SIZE    // Advance pointer to next particle
         b       particle_manager_render__next
@@ -336,6 +347,8 @@ particle_manager_create_spark:
 
         mov     x9, PARTICLE_TYPE_SPARK
         str     x9, [x10, PS_PARTICLE_TYPE]
+        mov     x9, 2
+        str     x9, [x10, PS_LAYER]
         str     x1, [x10, PSSPARK_POS_X]
         str     x2, [x10, PSSPARK_POS_Y]
         str     w3, [x10, PSSPARK_COLOR]

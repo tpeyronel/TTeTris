@@ -297,6 +297,11 @@ game_loop__skip_update:
         mov     x0, x28
         bl      draw_canvas
 
+        add     x0, sp, PARTICLE_MANAGER
+        mov     x1, 0
+        mov     x2, x28
+        bl      particle_manager_render
+
         mov     x0, BOARD_ORIGIN_X
         mov     x1, BOARD_ORIGIN_Y
         mov     x19, x1
@@ -306,7 +311,8 @@ game_loop__skip_update:
         bl      draw_board
 
         add     x0, sp, PARTICLE_MANAGER
-        mov     x1, x28
+        mov     x1, 2
+        mov     x2, x28
         bl      particle_manager_render
 
         mov     x0, 64
