@@ -97,6 +97,87 @@ draw_argb_pixel:
 
 /*
  * Params:
+ *      w0: u32 (ARGB)          <- color A
+ *      w1: u32 (ARGB)          <- color B
+ *      w2: u32                 <- interpolation coefficient (0 <= w2 < 256)
+ */
+lerp_colors:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, 0xFF       // const x19 = 255 (for dividing)
+
+
+        mov     w11, w2         // w11 = Fs = src.alpha
+        mov     w12, 0xFF
+        sub     w12, w12, w11   // w12 = Fd = 255 - src.alpha
+
+        mov     w14, 0x0        // w14 = result
+
+
+        /* Blue */
+        ubfx    w9, w0, 0, 8    // w9 = src.b
+        mul     x9, x9, x11     // w9 = src.b * Fs
+
+        ubfx    w10, w1, 0, 8  // w10 = dst.b
+        mul     x10, x10, x12   // w10 = dst.b * Fd
+
+        add     x9, x9, x10     // w9 = (src.b * Fs) + (dst.b * Fd)
+        udiv    x9, x9, x19     // w9 = ((src.b * Fs) + (dst.b * Fd)) / 255
+
+        lsl     w9, w9, 0       // Shift to position
+        add     w14, w14, w9    // Add to result
+
+
+        /* Green */
+        ubfx    w9, w0, 8, 8    // w9 = src.g
+        mul     x9, x9, x11     // w9 = src.g * Fs
+
+        ubfx    w10, w1, 8, 8  // w10 = dst.g
+        mul     x10, x10, x12   // w10 = dst.g * Fd
+
+        add     x9, x9, x10     // w9 = (src.g * Fs) + (dst.g * Fd)
+        udiv    x9, x9, x19     // w9 = ((src.g * Fs) + (dst.g * Fd)) / 255
+
+        lsl     w9, w9, 8       // Shift to position
+        add     w14, w14, w9    // Add to result
+
+
+        /* Red */
+        ubfx    w9, w0, 16, 8   // w9 = src.r
+        mul     x9, x9, x11     // w9 = src.r * Fs
+
+        ubfx    w10, w1, 16, 8 // w10 = dst.r
+        mul     x10, x10, x12   // w10 = dst.r * Fd
+
+        add     x9, x9, x10     // w9 = (src.r * Fs) + (dst.r * Fd)
+        udiv    x9, x9, x19     // w9 = ((src.r * Fs) + (dst.r * Fd)) / 255
+
+        lsl     w9, w9, 16      // Shift to position
+        add     w14, w14, w9    // Add to result
+
+
+        /* Alpha */
+        ubfx    w9, w0, 24, 8   // w9 = src.a
+        mul     x9, x9, x11     // w9 = src.a * Fs
+
+        ubfx    w10, w1, 24, 8 // w10 = dst.a
+        mul     x10, x10, x12   // w10 = dst.a * Fd
+
+        add     x9, x9, x10     // w9 = (src.a * Fs) + (dst.a * Fd)
+        udiv    x9, x9, x19     // w9 = ((src.a * Fs) + (dst.a * Fd)) / 255
+
+        lsl     w9, w9, 24      // Shift to position
+        add     w14, w14, w9    // Add to result
+
+        mov     w0, w14
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
  *      x0: x coordinate         (left) 0 <= x < SCREEN_WIDTH (right)
  *      x1: y coordinate       (bottom) 0 <= y < SCREEN_HEIGHT (top)
  *      x2: beginning of framebuffer

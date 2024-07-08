@@ -63,6 +63,8 @@ PARTICLE_TYPES:
 
 
 
+        .equ SPARK_COLOR_COLD,          0xFFFFFF60
+        .equ SPARK_COLOR_WARM,          0xFFFFA020
 
 
 
@@ -401,12 +403,13 @@ particle_spark_draw:
         mul     x9, x0, x9              // x9 <- alpha                  (Q32)
         lsr     x9, x9, 32              // x9 <- alpha
         ldr     w19, [x20, PSSPARK_COLOR]
-        mov     w19, 0
-        bfi     w19, w9, 16, 8
-        bfi     w19, w9, 8, 8
-        bfi     w19, w9, 0, 8
-        mov     x9, 0xFF
-        bfi     w19, w9, 24, 8
+        // TODO: use x9 again (or similar) to implement dimming of the spark (or maybe color warming)
+        // mov     w19, 0
+        // bfi     w19, w9, 16, 8
+        // bfi     w19, w9, 8, 8
+        // bfi     w19, w9, 0, 8
+        // mov     x9, 0xFF
+        // bfi     w19, w9, 24, 8
 
 
 
@@ -473,20 +476,29 @@ create_spark_cluster__next:
         sub     x9, x0, x9
         bl      rand_gen_fixedp // x0 <- [0.0, 1.0)
         mul     x23, x0, x9     // x23 <- velocity x
-        mov     x9, 15
+        mov     x9, 10
         mul     x23, x23, x9
 
         bl      rand_gen_fixedp
         mov     x9, 1 << 31
         sub     x0, x0, x9      // x0 <- [-0.5, 0.5)
-        mov     x9, 150
+        mov     x9, 100
         mul     x24, x0, x9     // x24 <- [-5.0, 5.0) <- velocity y
+
+        mov     w0, 0
+        mov     w1, 256
+        bl      rand_gen_in_range
+
+        mov     w2, w0
+        ldr     w0, =SPARK_COLOR_COLD
+        ldr     w1, =SPARK_COLOR_WARM
+        bl      lerp_colors
+        mov     w3, w0
 
         mov     x0, x19
         mov     x1, x22
         mov     x2, x21
-        ldr     w3, =0xFFFFFF
-        ldr     x4, =(1000 * 1000)
+        ldr     x4, =(1000 * 500)
         mov     x5, x23
         mov     x6, x24
         bl      particle_manager_create_spark
