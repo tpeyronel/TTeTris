@@ -1951,9 +1951,21 @@ spawn_placement_particles:
                 bl      get_lowest_tetromino_cell_at_column
                 mov     x26, x0         // x26 <- this column's lowest cell, or -1
 
-                // Check if this column actually has any cells
-                cmp     x26, xzr
+                mov     x27, 0          // x27 <- new edge width
+
+                // Check if this column actually has any cells (ie x26 >= 0)
+                cmp     x26, 0
                 b.lt    spawn_placement_particles__flush_edge // If not, then flush the previous edge (if any)
+
+                // Check if cell is actually colliding with something
+                mov     x0, x20
+                mov     x1, x21
+                mov     x2, x19
+                mov     x3, x26
+                bl      is_cell_colliding
+                cmp     x0, 0
+                cset    x27, ne                                         // Set width to of the (potentially) new edge to 1 only if cell is colliding with something
+                b.eq    spawn_placement_particles__flush_edge           // If not, then flush the previous edge (if any)
 
                 // Check if we should extend the edge instead of flushing it
                 cmp     x26, x24
@@ -1981,8 +1993,7 @@ spawn_placement_particles:
 
                 spawn_placement_particles__start_edge:
                 mov     x24, x26                        // x24 <- new edge's row
-                cmp     x24, xzr
-                cset    x25, ge                         // x25 <- new edge's width. It should be 1 iff x24 is not -1 (ie, x24 >= 0).
+                mov     x25, x27                        // x25 <- new edge's width. It should be 1 iff x24 is not -1 (ie, x24 >= 0).
                 b       spawn_placement_particles__continue
 
                 spawn_placement_particles__extend_edge:
@@ -2064,6 +2075,53 @@ get_lowest_tetromino_cell_at_column:
 
         get_lowest_tetromino_cell_at_column__exit:
 
+        ldp     x22, x23, [sp], 16
+        ldp     x20, x21, [sp], 16
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: in struct TetrominoState*   <- tetromino state
+ *      x1: in/out struct BoardState*   <- board state
+ *      x2: u32                         <- x coordinate of cell, relative to tetromino
+ *      x3: u32                         <- y coordinate of cell, relative to tetromino
+ * Returns:
+ *      x0: u32                         <- 1 if cell (x, y) is colliding (ie, it has a non-air cell below,
+ *                                         or it is at the bottom of the board), 0 otherwise
+ */
+is_cell_colliding:
+        stp     lr, x19, [sp, -16]!
+        stp     x20, x21, [sp, -16]!
+        stp     x22, x23, [sp, -16]!
+
+        mov     x20, x0         // x20 <- tetromino state
+        mov     x21, x1         // x21 <- board state
+        mov     x22, x2         // x22 <- x coordinate
+        mov     x23, x3         // x23 <- y coordinate
+
+        ldr     x9, [x20, TSTATE_POS_X]         // x9 <- x coordinate of the tetromino, in board space
+        add     x9, x9, x22                     // x9 <- x coordinate of the cell we are interested in, in board space
+        ldr     x10, [x20, TSTATE_POS_Y]        // x10 <- y coordinate of the tetromino, in board space
+        add     x10, x10, x3
+
+        sub     x10, x10, 1                     // x10 <- y coordinate of the cell we are interested in, in board space
+
+        // Check if the cell of interest is at the bottom
+        cmp     x10, 0
+        cset    x0, lt                          // x0 = is_at_bottom() ? 1 : 0
+        cbnz    x0, is_cell_colliding__exit     // early return if x0 is 1
+
+        mov     x0, x9
+        mov     x1, x10
+        mov     x2, x21
+        bl      get_board_cell_at
+        cmp     x0, 0
+        cset    x0, ne                          // x0 = cell (x, y) is not air
+
+        is_cell_colliding__exit:
         ldp     x22, x23, [sp], 16
         ldp     x20, x21, [sp], 16
         ldp     lr, x19, [sp], 16
