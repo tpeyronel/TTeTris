@@ -33,7 +33,8 @@ PIXEL_S:
 draw_argb_pixel:
         stp     lr, x19, [sp, -16]!
 
-        mov     x19, 0xFF       // const x19 = 255 (for dividing)
+        mov     w19, 32897
+        movk    w19, 0x8080, lsl 16     // w19 (const) = 2155905153 (for dividing (compiler magic)))
 
 
         lsr     w11, w0, 24     // w11 = Fs = src.alpha
@@ -53,7 +54,8 @@ draw_argb_pixel:
         mul     x10, x10, x12   // w10 = dst.b * Fd
 
         add     x9, x9, x10     // w9 = (src.b * Fs) + (dst.b * Fd)
-        udiv    x9, x9, x19     // w9 = ((src.b * Fs) + (dst.b * Fd)) / 255
+        umull   x9, w9, w19
+        lsr     x9, x9, 39      // w9 = ((src.b * Fs) + (dst.b * Fd)) / 255
 
         lsl     w9, w9, 0       // Shift to position
         add     w14, w14, w9    // Add to result
@@ -67,7 +69,9 @@ draw_argb_pixel:
         mul     x10, x10, x12   // w10 = dst.g * Fd
 
         add     x9, x9, x10     // w9 = (src.g * Fs) + (dst.g * Fd)
-        udiv    x9, x9, x19     // w9 = ((src.g * Fs) + (dst.g * Fd)) / 255
+        umull   x9, w9, w19
+        lsr     x9, x9, 39      // w9 = ((src.g * Fs) + (dst.g * Fd)) / 255
+
 
         lsl     w9, w9, 8       // Shift to position
         add     w14, w14, w9    // Add to result
@@ -81,7 +85,8 @@ draw_argb_pixel:
         mul     x10, x10, x12   // w10 = dst.r * Fd
 
         add     x9, x9, x10     // w9 = (src.r * Fs) + (dst.r * Fd)
-        udiv    x9, x9, x19     // w9 = ((src.r * Fs) + (dst.r * Fd)) / 255
+        umull   x9, w9, w19
+        lsr     x9, x9, 39      // w9 = ((src.r * Fs) + (dst.r * Fd)) / 255
 
         lsl     w9, w9, 16      // Shift to position
         add     w14, w14, w9    // Add to result
