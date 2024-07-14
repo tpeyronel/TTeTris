@@ -21,6 +21,8 @@ draw_four_point_star:
         stp     x26, x27, [sp, 64]
 
         stp     x0, x1, [sp, -16]!      // Save x0 and x1 in stack for later use
+        stp     x2, x3, [sp, -16]!      // Save x2 and x3 in stack for later use
+        stp     x4, x5, [sp, -16]!      // Save x4 in stack for later use
 
         /* Normalize size (subtract 1 if size is even) */
         and     x9, x2, 0b1
@@ -133,6 +135,8 @@ draw_four_point_star__end_of_row:
 
 draw_four_point_star__end_of_quadrant:
 
+        ldp     x4, x5, [sp], 16        // Restore x4 from stack
+        ldp     x2, x3, [sp], 16        // Restore x2 and x3 from stack
         ldp     x0, x1, [sp], 16        // Restore x0 and x1 from stack
 
         /* Save arguments */
