@@ -20,6 +20,8 @@ draw_four_point_star:
         stp     x24, x25, [sp, 48]
         stp     x26, x27, [sp, 64]
 
+        // TODO: split into smaller functions
+
         stp     x0, x1, [sp, -16]!      // Save x0 and x1 in stack for later use
         stp     x2, x3, [sp, -16]!      // Save x2 and x3 in stack for later use
         stp     x4, x5, [sp, -16]!      // Save x4 in stack for later use
