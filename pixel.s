@@ -35,10 +35,8 @@ draw_argb_pixel:
         cmp     w11, 0xFF
         b.eq    draw_argb_pixel__opaque
 
-        stp     lr, x19, [sp, -16]!
-
-        mov     w19, 32897
-        movk    w19, 0x8080, lsl 16     // w19 (const) = 2155905153 (for dividing (compiler magic)))
+        mov     w2, 32897
+        movk    w2, 0x8080, lsl 16     // w2 (const) = 2155905153 (for dividing (compiler magic)))
 
 
         mov     w12, 0xFF
@@ -57,7 +55,7 @@ draw_argb_pixel:
         mul     x10, x10, x12   // w10 = dst.b * Fd
 
         add     x9, x9, x10     // w9 = (src.b * Fs) + (dst.b * Fd)
-        umull   x9, w9, w19
+        umull   x9, w9, w2
         lsr     x9, x9, 39      // w9 = ((src.b * Fs) + (dst.b * Fd)) / 255
 
         lsl     w9, w9, 0       // Shift to position
@@ -72,7 +70,7 @@ draw_argb_pixel:
         mul     x10, x10, x12   // w10 = dst.g * Fd
 
         add     x9, x9, x10     // w9 = (src.g * Fs) + (dst.g * Fd)
-        umull   x9, w9, w19
+        umull   x9, w9, w2
         lsr     x9, x9, 39      // w9 = ((src.g * Fs) + (dst.g * Fd)) / 255
 
 
@@ -88,7 +86,7 @@ draw_argb_pixel:
         mul     x10, x10, x12   // w10 = dst.r * Fd
 
         add     x9, x9, x10     // w9 = (src.r * Fs) + (dst.r * Fd)
-        umull   x9, w9, w19
+        umull   x9, w9, w2
         lsr     x9, x9, 39      // w9 = ((src.r * Fs) + (dst.r * Fd)) / 255
 
         lsl     w9, w9, 16      // Shift to position
@@ -97,8 +95,6 @@ draw_argb_pixel:
 
 
         str     w14, [x1]      // Draw blended pixel
-
-        ldp     lr, x19, [sp], 16
         ret
 
 
