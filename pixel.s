@@ -33,73 +33,27 @@ PIXEL_S:
 draw_argb_pixel:
         stp     lr, x19, [sp, -16]!
 
-        // ldr     w0, =0x7FFFFFFF
+        /* Store source color for loading into vector */
         str     w0, [sp, -4]!
-
-        // str     w0, [sp, -8]!
-        // str     w0, [sp, 4]
-        // str     w0, [sp, 8]
-        // str     w0, [sp, 12]
-        // str     w0, [sp, 16]
-        // str     w0, [sp, 20]
-        // str     w0, [sp, 24]
-        // str     w0, [sp, 28]
-        // str     w0, [sp, 32]
-        // str     w0, [sp, 36]
-        // str     w0, [sp, 40]
-        // str     w0, [sp, 44]
-        // ld4     { v0.b-v3.b }[0], [sp]
-        // ld1     { v0.8b }, [sp]
-        // ld1     { v0.b }[0], [sp], #1
-        // ld1     { v0.b }[2], [sp], #1
-        // ld1     { v0.b }[4], [sp], #1
-        // ld1     { v0.b }[6], [sp], #1
-        // ldr     w0, [sp], 8
-        // mov     v0.8b
-
-        // mov     x19, 100
-        // ins     v0.s[0], w19
-        // ins     v1.s[0], w19
-        // mov     x19, 50
-        // ins     v0.s[1], w19
-        // ins     v1.s[1], w19
-        // mov     x19, 200
-        // ins     v0.s[2], w19
-        // ins     v1.s[2], w19
-        // mov     x19, 1000
-        // ins     v0.s[3], w19
-        // ins     v1.s[3], w19
-        // mul     v2.4s, v0.4s, v1.4s
-
-        // ldr     w0, =0x7FFFFFFF
 
         /* Load source color into V0 */
         ld1     { v0.b }[0], [sp], #1
         ld1     { v0.b }[4], [sp], #1
         ld1     { v0.b }[8], [sp], #1
         sub     sp, sp, 3
-        // ld1     { v0.b }[12], [sp], #1
 
         /* Load dest color into V6 */
         ld1     { v6.b }[0], [x1], #1
         ld1     { v6.b }[4], [x1], #1
         ld1     { v6.b }[8], [x1], #1
         sub     x1, x1, 3
-        // ld1     { v6.b }[12], [x1, #3]
-
 
         /* Setup V1 for di */
-        // mov     w19, 0x7F
-        // str     w19, [sp]
-        // ldr     w19, [x1, #3]   // w19 = dest.alpha
-        // str     w19, [sp]
-
         lsr     w11, w0, 24     // w11 = Fs = src.alpha
         str     w11, [sp]
 
         /* Fill V1 with src.alpha */
         ld1r    { v1.4s }, [sp]
-
 
         /* Fill V7 with 255 - src.alpha */
         mov     w12, 0xFF
@@ -108,24 +62,19 @@ draw_argb_pixel:
         ld1r    { v7.4s }, [sp]
 
         /* Setup V3 for dividing by 255 */
-        mov     w19, 32897      // w19 (const) = 2155905153 (for dividing (compiler magic)))
+        mov     w19, 32897      // w19 (const) = 32897 (for dividing (compiler magic)))
         str     w19, [sp]
         ld1r    { v3.4s }, [sp]
 
+        mul     v2.4s, v0.4s, v1.4s     // V2 = Fs * V0
+        mul     v4.4s, v2.4s, v3.4s     // V4 = Magic * Fs * V0
+        ushr    v5.4s, v4.4s, 23        // V5 = final contribution by source color
 
-        /* V2 = V0 (rgb) * Fs */
-        mul     v2.4s, v0.4s, v1.4s
+        mul     v8.4s, v6.4s, v7.4s     // V8 = Fd * V6
+        mul     v9.4s, v8.4s, v3.4s     // V9 = Magic * Fd * V6
+        ushr    v10.4s, v9.4s, 23       // V10 = final contribution by dest color
 
-        mul     v4.4s, v2.4s, v3.4s
-        ushr    v5.4s, v4.4s, 23
-
-        /* V8 = V6 (rgb) * Fd */
-        mul     v8.4s, v6.4s, v7.4s
-        mul     v9.4s, v8.4s, v3.4s
-        ushr    v10.4s, v9.4s, 23
-
-        /* V11 = final color */
-        add     v11.4s, v5.4s, v10.4s
+        add     v11.4s, v5.4s, v10.4s   // V11 = final color
 
         st1     { v0.b }[0], [x1], #1
         st1     { v0.b }[4], [x1], #1
