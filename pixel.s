@@ -31,13 +31,16 @@ PIXEL_S:
  *      x1: in/out u32*         <- pointer in which to write pixel
  */
 draw_argb_pixel:
+        lsr     w11, w0, 24             // w11 = Fs = src.alpha
+        cmp     w11, 0xFF
+        b.eq    draw_argb_pixel__opaque
+
         stp     lr, x19, [sp, -16]!
 
         mov     w19, 32897
         movk    w19, 0x8080, lsl 16     // w19 (const) = 2155905153 (for dividing (compiler magic)))
 
 
-        lsr     w11, w0, 24     // w11 = Fs = src.alpha
         mov     w12, 0xFF
         sub     w12, w12, w11   // w12 = Fd = 255 - src.alpha
 
@@ -96,6 +99,11 @@ draw_argb_pixel:
         str     w14, [x1]      // Draw blended pixel
 
         ldp     lr, x19, [sp], 16
+        ret
+
+
+        draw_argb_pixel__opaque:
+        str     w0, [x1]      // Draw pixel directly, as it is fully opaque
         ret
 
 
