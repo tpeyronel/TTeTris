@@ -34,12 +34,7 @@ draw_argb_pixel:
         stp     lr, x19, [sp, -16]!
         sub     sp, sp, 4       // Make space for temps
 
-
-        /* Fill V0 with magic constant for dividing by 255 */
-        mov     w19, 32897
-        str     w19, [sp]
-        ld1r    { v0.4s }, [sp]
-
+        mov     w19, 32897      // Save magic constant (used for division by 255) to w19
 
         /* Load source color into V1 */
         str     w0, [sp]
@@ -48,13 +43,13 @@ draw_argb_pixel:
         ld1     { v1.b }[8], [sp], #1
         sub     sp, sp, 3
 
-        /* Fill V3 with src.alpha */
+        /* Fill V0 with src.alpha * Magic */
         lsr     w11, w0, 24     // w11 = Fs = src.alpha
-        str     w11, [sp]
-        ld1r    { v3.4s }, [sp]
+        mul     w9, w11, w19    // w9 = Fs * Magic
+        str     w9, [sp]
+        ld1r    { v0.4s }, [sp]
 
         /* Compute source color contribution and store it in V1 */
-        mul     v1.4s, v1.4s, v3.4s     // V1 = Fs * Src
         mul     v1.4s, v1.4s, v0.4s     // V1 = Magic * Fs * Src
         ushr    v1.4s, v1.4s, 23        // V1 = final contribution by source color
 
@@ -65,14 +60,14 @@ draw_argb_pixel:
         ld1     { v2.b }[8], [x1], #1
         sub     x1, x1, 3
 
-        /* Fill V3 with 255 - src.alpha */
+        /* Fill V0 with (255 - src.alpha) * Magic */
         mov     w12, 0xFF
-        sub     w11, w12, w11           // w11 = Fd = 255 - src.alpha
-        str     w11, [sp]
-        ld1r    { v3.4s }, [sp]
+        sub     w9, w12, w11            // w9 = Fd = 255 - src.alpha
+        mul     w9, w9, w19             // w9 = Fd * Magic
+        str     w9, [sp]
+        ld1r    { v0.4s }, [sp]
 
         /* Compute destination color contribution and store it in V2 */
-        mul     v2.4s, v2.4s, v3.4s     // V2 = Fd * Dst
         mul     v2.4s, v2.4s, v0.4s     // V2 = Magic * Fd * Dst
         ushr    v2.4s, v2.4s, 23        // V2 = final contribution by dest color
 
