@@ -32,55 +32,58 @@ PIXEL_S:
  */
 draw_argb_pixel:
         stp     lr, x19, [sp, -16]!
+        sub     sp, sp, 4       // Make space for temps
 
-        /* Store source color for loading into vector */
-        str     w0, [sp, -4]!
 
-        /* Load source color into V0 */
-        ld1     { v0.b }[0], [sp], #1
-        ld1     { v0.b }[4], [sp], #1
-        ld1     { v0.b }[8], [sp], #1
+        /* Fill V0 with magic constant for dividing by 255 */
+        mov     w19, 32897
+        str     w19, [sp]
+        ld1r    { v0.4s }, [sp]
+
+
+        /* Load source color into V1 */
+        str     w0, [sp]
+        ld1     { v1.b }[0], [sp], #1
+        ld1     { v1.b }[4], [sp], #1
+        ld1     { v1.b }[8], [sp], #1
         sub     sp, sp, 3
 
-        /* Load dest color into V6 */
-        ld1     { v6.b }[0], [x1], #1
-        ld1     { v6.b }[4], [x1], #1
-        ld1     { v6.b }[8], [x1], #1
-        sub     x1, x1, 3
-
-        /* Setup V1 for di */
+        /* Fill V3 with src.alpha */
         lsr     w11, w0, 24     // w11 = Fs = src.alpha
         str     w11, [sp]
-
-        /* Fill V1 with src.alpha */
-        ld1r    { v1.4s }, [sp]
-
-        /* Fill V7 with 255 - src.alpha */
-        mov     w12, 0xFF
-        sub     w11, w12, w11   // w11 = Fd = 255 - src.alpha
-        str     w11, [sp]
-        ld1r    { v7.4s }, [sp]
-
-        /* Setup V3 for dividing by 255 */
-        mov     w19, 32897      // w19 (const) = 32897 (for dividing (compiler magic)))
-        str     w19, [sp]
         ld1r    { v3.4s }, [sp]
 
-        mul     v2.4s, v0.4s, v1.4s     // V2 = Fs * V0
-        mul     v4.4s, v2.4s, v3.4s     // V4 = Magic * Fs * V0
-        ushr    v5.4s, v4.4s, 23        // V5 = final contribution by source color
+        /* Compute source color contribution and store it in V1 */
+        mul     v1.4s, v1.4s, v3.4s     // V1 = Fs * Src
+        mul     v1.4s, v1.4s, v0.4s     // V1 = Magic * Fs * Src
+        ushr    v1.4s, v1.4s, 23        // V1 = final contribution by source color
 
-        mul     v8.4s, v6.4s, v7.4s     // V8 = Fd * V6
-        mul     v9.4s, v8.4s, v3.4s     // V9 = Magic * Fd * V6
-        ushr    v10.4s, v9.4s, 23       // V10 = final contribution by dest color
 
-        add     v11.4s, v5.4s, v10.4s   // V11 = final color
+        /* Load dest color into V2 */
+        ld1     { v2.b }[0], [x1], #1
+        ld1     { v2.b }[4], [x1], #1
+        ld1     { v2.b }[8], [x1], #1
+        sub     x1, x1, 3
 
+        /* Fill V3 with 255 - src.alpha */
+        mov     w12, 0xFF
+        sub     w11, w12, w11           // w11 = Fd = 255 - src.alpha
+        str     w11, [sp]
+        ld1r    { v3.4s }, [sp]
+
+        /* Compute destination color contribution and store it in V2 */
+        mul     v2.4s, v2.4s, v3.4s     // V2 = Fd * Dst
+        mul     v2.4s, v2.4s, v0.4s     // V2 = Magic * Fd * Dst
+        ushr    v2.4s, v2.4s, 23        // V2 = final contribution by dest color
+
+
+        /* Compute final color and write it to framebuffer */
+        add     v0.4s, v1.4s, v2.4s     // V0 = final color
         st1     { v0.b }[0], [x1], #1
         st1     { v0.b }[4], [x1], #1
         st1     { v0.b }[8], [x1], #1
 
-        add     sp, sp, 4
+        add     sp, sp, 4               // Undo space for temps
         ldp     lr, x19, [sp], 16
         ret
 
