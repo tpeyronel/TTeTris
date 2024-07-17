@@ -30,11 +30,11 @@ PARTICLE_S:
 /* struct SparkParticleState */
         .equ PSSPARK_TIMESTAMP,         PS_LAYER + 8                    // u32
         .equ PSSPARK_COLOR,             PSSPARK_TIMESTAMP + 4           // u32
-        .equ PSSPARK_POS_X,             PSSPARK_COLOR + 4               // u64
-        .equ PSSPARK_POS_Y,             PSSPARK_POS_X + 8               // u64
-        .equ PSSPARK_DURATION,          PSSPARK_POS_Y + 8               // u64 <- duration in us
-        .equ PSSPARK_VELOCITY_X,        PSSPARK_DURATION + 8            // u64 (Q32)
-        .equ PSSPARK_VELOCITY_Y,        PSSPARK_VELOCITY_X + 8          // u64 (Q32)
+        .equ PSSPARK_POS_X,             PSSPARK_COLOR + 4               // f32
+        .equ PSSPARK_POS_Y,             PSSPARK_POS_X + 4               // f32
+        .equ PSSPARK_DURATION,          PSSPARK_POS_Y + 4               // u64 <- duration in us
+        .equ PSSPARK_VELOCITY_X,        PSSPARK_DURATION + 8            // f32
+        .equ PSSPARK_VELOCITY_Y,        PSSPARK_VELOCITY_X + 4          // f32
 
 /* struct ParticleManager */
         .equ PM_PARTICLE_COUNT,         0                               // u64 in [0..MAX_PARTICLES]
@@ -320,12 +320,14 @@ particle_star_draw:
 /*
  * Params:
  *      x0: in/out struct ParticleManager*
- *      x1: u64                                 <- x coordinate
- *      x2: u64                                 <- y coordinate
- *      w3: u32                                 <- color
- *      x4: u64                                 <- duration
- *      x5: u64                                 <- velocity x (Q32)
- *      x6: u64                                 <- velocity y (Q32)
+ *      w1: u32                                 <- color
+ *      x2: u64                                 <- duration
+ * * * * * *
+ *      s0: f32                                 <- x coordinate
+ *      s1: f32                                 <- y coordinate
+ *      s2: f32                                 <- x velocity
+ *      s3: f32                                 <- y velocity
+ *
  */
 particle_manager_create_spark:
         stp     lr, x19, [sp, -16]!
@@ -349,12 +351,12 @@ particle_manager_create_spark:
         str     x9, [x10, PS_PARTICLE_TYPE]
         mov     x9, 2
         str     x9, [x10, PS_LAYER]
-        str     x1, [x10, PSSPARK_POS_X]
-        str     x2, [x10, PSSPARK_POS_Y]
-        str     w3, [x10, PSSPARK_COLOR]
-        str     x4, [x10, PSSPARK_DURATION]
-        str     x5, [x10, PSSPARK_VELOCITY_X]
-        str     x6, [x10, PSSPARK_VELOCITY_Y]
+        str     w1, [x10, PSSPARK_COLOR]
+        str     x2, [x10, PSSPARK_DURATION]
+        str     s0, [x10, PSSPARK_POS_X]
+        str     s1, [x10, PSSPARK_POS_Y]
+        str     s2, [x10, PSSPARK_VELOCITY_X]
+        str     s3, [x10, PSSPARK_VELOCITY_Y]
 
         bl      get_time
         str     w0, [x10, PSSPARK_TIMESTAMP]
@@ -377,7 +379,20 @@ particle_spark_update:
         stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
 
-        mov     x19, x0
+        mov     x19, x0         // x19 <- particle state
+
+        ldr     s0, [x19, PSSPARK_POS_X]        // s0 <- coordinate x
+        ldr     s1, [x19, PSSPARK_POS_Y]        // s1 <- coordinate y
+        ldr     s2, [x19, PSSPARK_VELOCITY_X]   // s2 <- velocity x
+        ldr     s3, [x19, PSSPARK_VELOCITY_Y]   // s3 <- velocity y
+
+        ldr     s4, F32_TICK_TIME
+
+        fmadd   s0, s2, s4, s0                  // s0 += delta x
+        fmadd   s1, s3, s4, s1                  // s1 += delta y
+
+        str     s0, [x19, PSSPARK_POS_X]
+        str     s1, [x19, PSSPARK_POS_Y]
 
         ldr     w0, [x19, PSSPARK_TIMESTAMP]
         bl      get_elapsed_time
@@ -426,28 +441,11 @@ particle_spark_draw:
         // bfi     w19, w9, 24, 8
 
 
+        ldr     s0, [x20, PSSPARK_POS_X]        // s0 <- x coordinate
+        ldr     s1, [x20, PSSPARK_POS_Y]        // s1 <- y coordinate
 
-
-        ldr     w0, [x20, PSSPARK_TIMESTAMP]
-        bl      get_elapsed_time
-        lsl     x0, x0, 16              // x0 <- elapsed time in us     (Q16)
-        ldr     x9, =US_PER_SECOND
-        udiv    x0, x0, x9              // x0 <- time in seconds        (Q16)
-
-        ldr     x9, [x20, PSSPARK_VELOCITY_X]         // x9 <- velocity x      (Q32)
-        ldr     x10, [x20, PSSPARK_VELOCITY_Y]        // x10 <- velocity y     (Q32)
-        asr     x9, x9, 16                      // x9 <- velocity x      (Q16)
-        asr     x10, x10, 16                    // x10 <- velocity y     (Q16)
-
-        mul     x2, x9, x0      // x2 <- delta x       (Q32)
-        mul     x3, x10, x0     // x3 <- delta y       (Q32)
-        q32_to_int x2, x2, x9   // x2 <- delta x
-        q32_to_int x3, x3, x9   // x3 <- delta y
-
-        ldr     x0, [x20, PSSPARK_POS_X]
-        ldr     x1, [x20, PSSPARK_POS_Y]
-        add     x22, x0, x2      // x22 <- end x coordinate
-        add     x23, x1, x3      // x23 <- end y coordinate
+        fcvtzs  x22, s0                         // x22 <- x coordinate
+        fcvtzs  x23, s1                         // x23 <- y coordinate
 
         mov     x0, x22
         mov     x1, x23
@@ -507,32 +505,41 @@ create_spark_cluster:
         stp     x22, x23, [sp, -16]!
         stp     x24, x25, [sp, -16]!
         stp     x26, x27, [sp, -16]!
+        stp     s19, s20, [sp, -8]!
+        stp     s21, s22, [sp, -8]!
+        stp     s23, s24, [sp, -8]!
 
-        mov     x20, x0
-        mov     x21, x1
-        mov     x26, x2
-        mov     x19, x3
+        mov     x20, x0         // x20 <- left x coordinate
+        mov     x21, x1         // x21 <- y coordinate
+        mov     x26, x2         // x26 <- cluster width
+        mov     x19, x3         // x19 <- particle manager
+
+        scvtf   s19, x20        // s19 <- left x coordinate
+        scvtf   s20, x26        // s20 <- ClusterWidth
+        fmov    s21, 0.5
+        fmul    s21, s20, s21   // s21 <- ClusterWidth / 2
+
 
         mov     x25, 64
 
 create_spark_cluster__next:
-        mov     x0, 0
-        mov     x1, x26
-        bl      rand_gen_in_range
-        add     x22, x20, x0    // x22 <- spark x pos
+        movi    d0, 0
+        fmov    s1, s20
+        bl      rand_gen_f32_in_range   // s0 <- [0.0, ClusterWidth)
+        fadd    s22, s19, s0            // s22 <- spark x pos
 
-        lsr     x9, x26, 1      // x9 <- cluster width / 2
-        sub     x9, x0, x9
-        bl      rand_gen_fixedp // x0 <- [0.0, 1.0)
-        mul     x23, x0, x9     // x23 <- velocity x
-        mov     x9, 10
-        mul     x23, x23, x9
+        fsub    s23, s0, s21            // s23 <- [-ClusterWidth / 2, ClusterWidth / 2)
+        bl      rand_gen_f32            // s0 <- [0.0, 1.0)
+        fmul    s23, s0, s23            // s23 <- x velocity
+        fmov    s9, 8
+        fmul    s23, s23, s9            // s23 <- x velocity scaled
 
-        bl      rand_gen_fixedp
-        mov     x9, 1 << 31
-        sub     x0, x0, x9      // x0 <- [-0.5, 0.5)
-        mov     x9, 100
-        mul     x24, x0, x9     // x24 <- [-5.0, 5.0) <- velocity y
+        bl      rand_gen_f32    // s0 <- [0.0, 1.0)
+        fmov    s9, 0.5
+        fsub    s24, s0, s9     // s0 <- [-0.5, 0.5)
+        fmov    s9, 8
+        fmul    s9, s9, s9
+        fmul    s24, s24, s9    // s24 <- y velocity
 
         mov     w0, 0
         mov     w1, 256
@@ -542,20 +549,24 @@ create_spark_cluster__next:
         ldr     w0, =SPARK_COLOR_COLD
         ldr     w1, =SPARK_COLOR_WARM
         bl      lerp_colors
-        mov     w3, w0
+        mov     w1, w0
 
         mov     x0, x19
-        mov     x1, x22
-        mov     x2, x21
-        ldr     x4, =(1000 * 500)
-        mov     x5, x23
-        mov     x6, x24
+        ldr     x2, =(1000 * 500)
+        fmov    s9, w9
+        fmov    s0, s22
+        scvtf   s1, x21
+        fmov    s2, s23
+        fmov    s3, s24
         bl      particle_manager_create_spark
 
         sub     x25, x25, 1
         cbnz    x25, create_spark_cluster__next
 
 
+        ldp     s23, s24, [sp], 8
+        ldp     s21, s22, [sp], 8
+        ldp     s19, s20, [sp], 8
         ldp     x26, x27, [sp], 16
         ldp     x24, x25, [sp], 16
         ldp     x22, x23, [sp], 16
