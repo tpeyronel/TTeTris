@@ -41,4 +41,35 @@ rand_gen_fixedp:
 
 
 
+/*
+ * Returns:
+ *      s0: f32                 <- random number in range [0.0, 1.0)
+ */
+rand_gen_f32:
+        ldr     x9, =RNG_NUMBER_ADDRESS
+        ldr     w9, [x9]                // w9 <- random number in range 0, ..., (2^32 - 1)     (i.e., [0.0, 1.0) in Q32)
+        ucvtf   s0, w9, #32             // s0 <- random number in range [0.0, 1.0)
+        ret
+
+
+
+/*
+ * Params:
+ *      s0: f32                 <- min (inclusive)
+ *      s1: f32                 <- max (exclusive)
+ * Returns:
+ *      s0: f32                 <- random number in range [0.0, 1.0)
+ */
+rand_gen_f32_in_range:
+        fsub    s2, s1, s0              // s2 <- range
+
+        ldr     x9, =RNG_NUMBER_ADDRESS
+        ldr     w9, [x9]                // w9 <- random number in range 0, ..., (2^32 - 1)     (i.e., [0.0, 1.0) in Q32)
+        ucvtf   s1, w9, #32             // s1 <- random number in range [0.0, 1.0)
+
+        fmadd   s0, s1, s2, s0          // s0 <- random number in range [min, max)
+        ret
+
+
+
 .endif
