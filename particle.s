@@ -397,8 +397,9 @@ particle_spark_update:
  *      x1: out u32*                    <- framebuffer
  */
 particle_spark_draw:
-        stp     lr, x19, [sp, -32]!
-        stp     x20, x21, [sp, 16]
+        stp     lr, x19, [sp, -16]!
+        stp     x20, x21, [sp, -16]!
+        stp     x22, x23, [sp, -16]!
 
         mov     x20, x0         // x20 <- particle state
         mov     x21, x1         // x21 <- framebuffer
@@ -445,15 +446,50 @@ particle_spark_draw:
 
         ldr     x0, [x20, PSSPARK_POS_X]
         ldr     x1, [x20, PSSPARK_POS_Y]
-        add     x0, x0, x2      // x2 <- end x coordinate
-        add     x1, x1, x3      // x3 <- end y coordinate
+        add     x22, x0, x2      // x22 <- end x coordinate
+        add     x23, x1, x3      // x23 <- end y coordinate
 
+        mov     x0, x22
+        mov     x1, x23
         mov     x2, x21
         mov     w3, w19
         bl      draw_argb_pixel_at
 
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 32
+        /* Set alpha of border pixels to 0.5 */
+        mov     w9, 0x80
+        bfi     w19, w9, 24, 8
+
+        /* x + 1 */
+        add     x0, x22, 1
+        mov     x1, x23
+        mov     x2, x21
+        mov     w3, w19
+        bl      draw_argb_pixel_at
+
+        /* x - 1 */
+        sub     x0, x22, 1
+        mov     x1, x23
+        mov     x2, x21
+        mov     w3, w19
+        bl      draw_argb_pixel_at
+
+        /* y + 1 */
+        mov     x0, x22
+        add     x1, x23, 1
+        mov     x2, x21
+        mov     w3, w19
+        bl      draw_argb_pixel_at
+
+        /* y - 1 */
+        mov     x0, x22
+        sub     x1, x23, 1
+        mov     x2, x21
+        mov     w3, w19
+        bl      draw_argb_pixel_at
+
+        ldp     x22, x23, [sp], 16
+        ldp     x20, x21, [sp], 16
+        ldp     lr, x19, [sp], 16
         ret
 
 
