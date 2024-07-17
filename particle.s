@@ -30,10 +30,10 @@ PARTICLE_S:
 /* struct SparkParticleState */
         .equ PSSPARK_TIMESTAMP,         PS_LAYER + 8                    // u32
         .equ PSSPARK_COLOR,             PSSPARK_TIMESTAMP + 4           // u32
-        .equ PSSPARK_POS_X,             PSSPARK_COLOR + 4               // f32
+        .equ PSSPARK_DURATION,          PSSPARK_COLOR + 4               // u64 <- duration in us
+        .equ PSSPARK_POS_X,             PSSPARK_DURATION + 8            // f32
         .equ PSSPARK_POS_Y,             PSSPARK_POS_X + 4               // f32
-        .equ PSSPARK_DURATION,          PSSPARK_POS_Y + 4               // u64 <- duration in us
-        .equ PSSPARK_VELOCITY_X,        PSSPARK_DURATION + 8            // f32
+        .equ PSSPARK_VELOCITY_X,        PSSPARK_POS_Y + 4               // f32
         .equ PSSPARK_VELOCITY_Y,        PSSPARK_VELOCITY_X + 4          // f32
 
 /* struct ParticleManager */
