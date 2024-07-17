@@ -22,14 +22,14 @@ draw_four_point_star:
 
         // TODO: split into smaller functions
 
-        stp     x0, x1, [sp, -16]!      // Save x0 and x1 in stack for later use
-        stp     x2, x3, [sp, -16]!      // Save x2 and x3 in stack for later use
-        stp     x4, x5, [sp, -16]!      // Save x4 in stack for later use
-
         /* Normalize size (subtract 1 if size is even) */
         and     x9, x2, 0b1
         eor     x9, x9, 0b1
         sub     x2, x2, x9
+
+        stp     x0, x1, [sp, -16]!      // Save x0 and x1 in stack for later use
+        stp     x2, x3, [sp, -16]!      // Save x2 and x3 in stack for later use
+        stp     x4, x5, [sp, -16]!      // Save x4 in stack for later use
 
         /* Early return if size <= 0 */
         cmp     x2, 0
