@@ -2,6 +2,11 @@
 .ifndef CONSTANTS_S
 CONSTANTS_S:
 
+        .equ TICKS_PER_SECOND,          60
+        .equ MS_PER_TICK,               1000 / TICKS_PER_SECOND         // unused
+        .equ US_PER_TICK,               1000000 / TICKS_PER_SECOND
+        F32_TICK_TIME: .float           0.01666666666666666666666666666667
+
 	.equ SCREEN_WIDTH,                      640
 	.equ SCREEN_HEIGH,                      480
         .equ SCREEN_PIXELS,                     SCREEN_WIDTH * SCREEN_HEIGH

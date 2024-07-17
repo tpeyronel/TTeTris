@@ -17,11 +17,6 @@
 
         .equ TEST_BINARY_TO_DECIMAL_MAX,        10000
 
-        .equ TICKS_PER_SECOND,          60
-        .equ MS_PER_TICK,               1000 / TICKS_PER_SECOND         // unused
-        .equ US_PER_TICK,               1000000 / TICKS_PER_SECOND
-
-
         .equ MS_PER_DROP,               400
         .equ US_PER_AUTO_DROP,          MS_PER_DROP * 1000
 
