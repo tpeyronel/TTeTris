@@ -37,7 +37,7 @@ CONSTANTS_S:
 
 
 f32_0_9:
-        .float                  0.99
+        .float                  0.9
 f32_1000000:
         .float                  1000000
 
