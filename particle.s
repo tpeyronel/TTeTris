@@ -64,8 +64,8 @@ PARTICLE_TYPES:
 
 
 
-        .equ SPARK_COLOR_COLD,          0xFFFFFF60
-        .equ SPARK_COLOR_WARM,          0xFFFFA020
+        .equ SPARK_COLOR_COLD,          0xFFFFFFFF
+        .equ SPARK_COLOR_WARM,          0xFFFFC18D
 
 
 
