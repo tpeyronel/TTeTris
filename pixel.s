@@ -202,9 +202,15 @@ draw_argb_pixel_at:
         stp     x20, x21, [sp, 16]
 
         mov     x19, (SCREEN_HEIGH - 1)
-        sub     x19, x19, x1
+        subs    x19, x19, x1
+
+        b.lo    draw_argb_pixel_at__skip        // Skip drawing if out of vertical bounds
 
         mov     x20, SCREEN_WIDTH
+
+        cmp     x20, x0
+        b.ls    draw_argb_pixel_at__skip        // Skip drawing if out of horizontal bounds
+
         mul     x20, x20, x19                   // x20 = vertical offset
         add     x20, x20, x0                    // x20 = vertical offset + horizontal offset
         lsl     x20, x20, BYTES_PER_PIXEL_SHIFT // x20 = total offset
@@ -223,6 +229,7 @@ draw_argb_pixel_at:
         mov     x0, x19
         mov     x1, x21
 
+        draw_argb_pixel_at__skip:
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 32
         ret
