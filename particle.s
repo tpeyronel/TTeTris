@@ -66,6 +66,8 @@ PARTICLE_TYPES:
 
         .equ SPARK_COLOR_COLD,          0xFFFFFFFF
         .equ SPARK_COLOR_WARM,          0xFFFFC18D
+        .equ SPARK_DURATION_MIN,        1000 * 500
+        .equ SPARK_DURATION_MAX,        1000 * 800
 
 
 
@@ -553,10 +555,15 @@ create_spark_cluster__next:
         ldr     w0, =SPARK_COLOR_COLD
         ldr     w1, =SPARK_COLOR_WARM
         bl      lerp_colors
-        mov     w1, w0
+        mov     w22, w0
+
+        ldr     w0, =SPARK_DURATION_MIN
+        ldr     w1, =SPARK_DURATION_MAX
+        bl      rand_gen_in_range
+        mov     w2, w0
 
         mov     x0, x19
-        ldr     x2, =(1000 * 1000)
+        mov     w1, w22
         fmov    s9, w9
         fmov    s0, s22
         scvtf   s1, x21
