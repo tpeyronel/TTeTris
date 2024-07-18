@@ -536,7 +536,7 @@ create_spark_cluster__next:
 
         fmov    s9, 0.5
         fsub    s23, s0, s9             // s23 <- [-0.5, 0.5)
-        fmov    s9, 10
+        fmov    s9, 8
         fmul    s9, s9, s9
         fmul    s23, s23, s9            // s23 <- x velocity
 
@@ -549,7 +549,7 @@ create_spark_cluster__next:
         bl      rand_gen_f32    // s0 <- [0.0, 1.0)
         fmov    s9, 0.5
         fsub    s24, s0, s9     // s0 <- [-0.5, 0.5)
-        fmov    s9, 9
+        fmov    s9, 7
         fmul    s9, s9, s9
         fmul    s24, s24, s9    // s24 <- y velocity
 
