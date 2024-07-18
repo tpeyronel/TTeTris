@@ -531,16 +531,20 @@ create_spark_cluster:
         fcvtzu  x25, s9         // x25 <- remaining sparks
 
 create_spark_cluster__next:
-        movi    d0, 0
-        fmov    s1, s20
-        bl      rand_gen_f32_in_range   // s0 <- [0.0, ClusterWidth)
-        fadd    s22, s19, s0            // s22 <- spark x pos
-
-        fsub    s23, s0, s21            // s23 <- [-ClusterWidth / 2, ClusterWidth / 2)
         bl      rand_gen_f32            // s0 <- [0.0, 1.0)
-        fmul    s23, s0, s23            // s23 <- x velocity
-        fmov    s9, 7
-        fmul    s23, s23, s9            // s23 <- x velocity scaled
+        fmadd   s22, s0, s20, s19       // s22 <- spark x pos
+
+        fmov    s9, 0.5
+        fsub    s23, s0, s9             // s23 <- [-0.5, 0.5)
+        fmov    s9, 10
+        fmul    s9, s9, s9
+        fmul    s23, s23, s9            // s23 <- x velocity
+
+        /* Add some random variation to the x velocity */
+        fmov    s0, 0.5
+        fmov    s1, 2.0
+        bl      rand_gen_f32_in_range   // s0 <- [0.5, 2.0)
+        fmul    s23, s23, s0
 
         bl      rand_gen_f32    // s0 <- [0.0, 1.0)
         fmov    s9, 0.5
