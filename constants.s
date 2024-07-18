@@ -7,6 +7,8 @@ CONSTANTS_S:
         .equ US_PER_TICK,               1000000 / TICKS_PER_SECOND
         F32_TICK_TIME: .float           0.01666666666666666666666666666667
 
+        F32_SPARK_GRAVITY: .float       -75.0
+
 	.equ SCREEN_WIDTH,                      640
 	.equ SCREEN_HEIGH,                      480
         .equ SCREEN_PIXELS,                     SCREEN_WIDTH * SCREEN_HEIGH

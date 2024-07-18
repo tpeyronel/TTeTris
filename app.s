@@ -184,7 +184,7 @@ main:
         str     wzr, [x9, GPIO_GPFSEL0]
 
         // Allocate and init struct GameState
-        mov     x9, STRUCT_GAME_STATE_SIZE
+        ldr     x9, =STRUCT_GAME_STATE_SIZE
         sub     sp, sp, x9
 
         mov     x0, sp
@@ -352,7 +352,7 @@ game_loop__skip_held_piece:
 
         /* Copy back buffer to real framebuffer */
         mov     x0, x28
-        mov     x9, STRUCT_GAME_STATE_SIZE
+        ldr     x9, =STRUCT_GAME_STATE_SIZE
         ldr     x1, [sp, x9]                    // restore original framebuffer address from stack
         bl      copy_framebuffer
 

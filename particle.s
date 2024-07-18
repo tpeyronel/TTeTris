@@ -9,7 +9,7 @@ PARTICLE_S:
         .include "./rand.s"
         .include "./tetris_cell.s"
 
-        .equ MAX_PARTICLES,     256
+        .equ MAX_PARTICLES,     1024
 
         .equ MAX_STRUCT_PS_SIZE,        8 * 16  // Must be multiple of 32 to work with particle_state_copy
 
@@ -387,12 +387,16 @@ particle_spark_update:
         ldr     s3, [x19, PSSPARK_VELOCITY_Y]   // s3 <- velocity y
 
         ldr     s4, F32_TICK_TIME
+        ldr     s5, F32_SPARK_GRAVITY
+
+        fmadd   s3, s4, s5, s3                  // s3 += delta y velocity (gravity)
 
         fmadd   s0, s2, s4, s0                  // s0 += delta x
         fmadd   s1, s3, s4, s1                  // s1 += delta y
 
         str     s0, [x19, PSSPARK_POS_X]
         str     s1, [x19, PSSPARK_POS_Y]
+        str     s3, [x19, PSSPARK_VELOCITY_Y]
 
         ldr     w0, [x19, PSSPARK_TIMESTAMP]
         bl      get_elapsed_time
@@ -531,13 +535,13 @@ create_spark_cluster__next:
         fsub    s23, s0, s21            // s23 <- [-ClusterWidth / 2, ClusterWidth / 2)
         bl      rand_gen_f32            // s0 <- [0.0, 1.0)
         fmul    s23, s0, s23            // s23 <- x velocity
-        fmov    s9, 8
+        fmov    s9, 7
         fmul    s23, s23, s9            // s23 <- x velocity scaled
 
         bl      rand_gen_f32    // s0 <- [0.0, 1.0)
         fmov    s9, 0.5
         fsub    s24, s0, s9     // s0 <- [-0.5, 0.5)
-        fmov    s9, 8
+        fmov    s9, 9
         fmul    s9, s9, s9
         fmul    s24, s24, s9    // s24 <- y velocity
 
@@ -552,7 +556,7 @@ create_spark_cluster__next:
         mov     w1, w0
 
         mov     x0, x19
-        ldr     x2, =(1000 * 500)
+        ldr     x2, =(1000 * 1000)
         fmov    s9, w9
         fmov    s0, s22
         scvtf   s1, x21
