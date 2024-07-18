@@ -525,8 +525,10 @@ create_spark_cluster:
         fmov    s21, 0.5
         fmul    s21, s20, s21   // s21 <- ClusterWidth / 2
 
-
-        mov     x25, 64
+        ucvtf   s9, x26         // s9 <- cluster width
+        ldr     s10, F32_SPARK_CLUSTER_DENSITY
+        fmul    s9, s10, s9     // s9 <- ClusterWidth * ClusterDensity
+        fcvtzu  x25, s9         // x25 <- remaining sparks
 
 create_spark_cluster__next:
         movi    d0, 0
