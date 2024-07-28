@@ -322,7 +322,7 @@ game_loop__skip_update:
         mov     x1, 128
         sub     x2, x9, TETROMINO_ID_BIAS
         mov     x3, x28
-        bl      draw_tetromino_at
+        bl      draw_framed_tetromino_at
 game_loop__skip_held_piece:
 
         mov     x0, (SCREEN_WIDTH - 1)
@@ -774,6 +774,124 @@ draw_board_frame__cols_next_row:
         add     x24, x24, 1
         cmp     x24, (BOARD_HEIGHT + 1)
         b.lt    draw_board_frame__cols_next_row
+
+
+        ldp     x24, x25, [sp, 48]
+        ldp     x22, x23, [sp, 32]
+        ldp     x20, x21, [sp, 16]
+        ldp     lr, x19, [sp], 64
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- x coordinate 0 <= x < SCREEN_WIDTH
+ *      x1: u64                         <- y coordinate 0 <= y < SCREEN_HEIGHT
+ *      x2: u64                         <- tetromino id
+ *      x3: in/out u32*                 <- framebuffer
+ */
+draw_framed_tetromino_at:
+        stp     lr, x19, [sp, -16]!
+        stp     x20, x21, [sp, -16]!
+
+        mov     x19, x3         // x19 <- framebuffer
+        mov     x20, x0         // x20 <- x coordinate
+        mov     x21, x1         // x21 <- y coordinate
+
+        // NOTE: we add TCS to x20 (expected), but we sub TCS to x21: this is because
+        // in their "default" 4x4 representations, all tetrominos are floating by _two_ cells.
+        add     x0, x20, TETRIS_CELL_SIZE
+        sub     x1, x21, TETRIS_CELL_SIZE
+        /* (same x2 and x3)  */
+        bl      draw_tetromino_at
+
+        mov     x0, x20
+        mov     x1, x21
+        mov     x2, 6
+        mov     x3, 4
+        mov     x4, x19
+        bl      draw_tetris_cell_frame
+
+        ldp     x20, x21, [sp], 16
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
+ *      x0: u64                         <- bottom left x coordinate 0 <= x < SCREEN_WIDTH
+ *      x1: u64                         <- bottom left y coordinate 0 <= y < SCREEN_HEIGHT
+ *      x2: u64                         <- width in cells
+ *      x3: u64                         <- height in cells
+ *      x4: in/out u32*                 <- framebuffer
+ */
+draw_tetris_cell_frame:
+        stp     lr, x19, [sp, -64]!
+        stp     x20, x21, [sp, 16]
+        stp     x22, x23, [sp, 32]
+        stp     x24, x25, [sp, 48]
+
+        mov     x19, x4         // x19 <- framebuffer
+        mov     x20, x0         // x20 <- bottom left x coordinate
+        mov     x21, x1         // x21 <- bottom left y coordinate
+        mov     x9, TETRIS_CELL_SIZE
+        mul     x22, x2, x9
+        add     x22, x0, x22    // x22 <- "top right + 1" x coordinate
+        mul     x23, x3, x9
+        add     x23, x1, x23    // x23 <- "top right + 1" y coordinate
+
+
+        /* Draw bottom and top rows */
+
+        mov     x24, x20        // x24 <- x iterator
+        draw_tetris_cell_frame__rows_next_col:
+                mov     x0, x24
+                mov     x1, x21                         // x1 <- y of bottom row
+                ldr     x2, =FRAME_DIFFUSE_COLOR
+                ldr     x3, =FRAME_SPECULAR_COLOR
+                ldr     x4, =FRAME_AMBIENT_COLOR
+                mov     x5, x19
+                bl      draw_tetris_cell_by_colors
+
+                mov     x0, x24
+                sub     x1, x23, TETRIS_CELL_SIZE       // x1 <- y of top row
+                ldr     x2, =FRAME_DIFFUSE_COLOR
+                ldr     x3, =FRAME_SPECULAR_COLOR
+                ldr     x4, =FRAME_AMBIENT_COLOR
+                mov     x5, x19
+                bl      draw_tetris_cell_by_colors
+
+                add     x24, x24, TETRIS_CELL_SIZE
+                cmp     x24, x22
+                b.lt    draw_tetris_cell_frame__rows_next_col
+
+
+        /* Draw left and right columns */
+
+        sub     x22, x22, TETRIS_CELL_SIZE      // x22 <- (top) right x coordinate
+        add     x24, x21, TETRIS_CELL_SIZE      // y iterator (we start at 1 because 0 has already been drawn)
+        draw_tetris_cell_frame__cols_next_row:
+                mov     x0, x20
+                mov     x1, x24
+                ldr     x2, =FRAME_DIFFUSE_COLOR
+                ldr     x3, =FRAME_SPECULAR_COLOR
+                ldr     x4, =FRAME_AMBIENT_COLOR
+                mov     x5, x19
+                bl      draw_tetris_cell_by_colors
+
+                mov     x0, x22
+                mov     x1, x24
+                ldr     x2, =FRAME_DIFFUSE_COLOR
+                ldr     x3, =FRAME_SPECULAR_COLOR
+                ldr     x4, =FRAME_AMBIENT_COLOR
+                mov     x5, x19
+                bl      draw_tetris_cell_by_colors
+
+                add     x24, x24, TETRIS_CELL_SIZE
+                cmp     x24, x23
+                b.lt    draw_tetris_cell_frame__cols_next_row
 
 
         ldp     x24, x25, [sp, 48]
