@@ -705,81 +705,14 @@ draw_board_inner__skip_cell:
  *      x2: in/out u32*                 <- framebuffer
  */
 draw_board_frame:
-        stp     lr, x19, [sp, -64]!
-        stp     x20, x21, [sp, 16]
-        stp     x22, x23, [sp, 32]
-        stp     x24, x25, [sp, 48]
+        stp     lr, x19, [sp, -16]!
 
-        mov     x20, x0         // x20 <- bottom left x coordinate
-        mov     x21, x1         // x21 <- bottom left y coordinate
-        mov     x22, x2         // x22 <- framebuffer
+        mov     x4, x2
+        mov     x2, BOARD_WIDTH + 2
+        mov     x3, BOARD_HEIGHT + 2
+        bl      draw_tetris_cell_frame
 
-
-/* Draw bottom and top rows */
-        mov     x23, ((BOARD_HEIGHT + 1) * TETRIS_CELL_SIZE)    // vertical offset for top row, in pixels
-
-        mov     x24, 0          // x iterator
-draw_board_frame__rows_next_col:
-        mov     x9, TETRIS_CELL_SIZE
-        mul     x25, x9, x24    // x25 <- x offset in coords to current cell
-        add     x25, x20, x25   // x25 <- bottom left x of current cell
-
-        mov     x0, x25
-        mov     x1, x21         // x1 <- bottom left y of bottom row
-        ldr     x2, =FRAME_DIFFUSE_COLOR
-        ldr     x3, =FRAME_SPECULAR_COLOR
-        ldr     x4, =FRAME_AMBIENT_COLOR
-        mov     x5, x22
-        bl      draw_tetris_cell_by_colors
-
-        mov     x0, x25
-        add     x1, x21, x23    // x1 <- bottom left y of top row
-        ldr     x2, =FRAME_DIFFUSE_COLOR
-        ldr     x3, =FRAME_SPECULAR_COLOR
-        ldr     x4, =FRAME_AMBIENT_COLOR
-        mov     x5, x22
-        bl      draw_tetris_cell_by_colors
-
-        add     x24, x24, 1
-        cmp     x24, (BOARD_WIDTH + 2)
-        b.lt    draw_board_frame__rows_next_col
-
-
-
-/* Draw left and right columns */
-        mov     x23, ((BOARD_WIDTH + 1) * TETRIS_CELL_SIZE)    // horizontal offset for right column, in pixels
-
-        mov     x24, 1          // y iterator (we start at 1 because 0 has already been drawn)
-draw_board_frame__cols_next_row:
-        mov     x9, TETRIS_CELL_SIZE
-        mul     x25, x9, x24    // x25 <- y offset in coords to current cell
-        add     x25, x21, x25   // x25 <- bottom left y of current cell
-
-        mov     x0, x20
-        mov     x1, x25
-        ldr     x2, =FRAME_DIFFUSE_COLOR
-        ldr     x3, =FRAME_SPECULAR_COLOR
-        ldr     x4, =FRAME_AMBIENT_COLOR
-        mov     x5, x22
-        bl      draw_tetris_cell_by_colors
-
-        add     x0, x20, x23    // x1 <- bottom left y of right column
-        mov     x1, x25
-        ldr     x2, =FRAME_DIFFUSE_COLOR
-        ldr     x3, =FRAME_SPECULAR_COLOR
-        ldr     x4, =FRAME_AMBIENT_COLOR
-        mov     x5, x22
-        bl      draw_tetris_cell_by_colors
-
-        add     x24, x24, 1
-        cmp     x24, (BOARD_HEIGHT + 1)
-        b.lt    draw_board_frame__cols_next_row
-
-
-        ldp     x24, x25, [sp, 48]
-        ldp     x22, x23, [sp, 32]
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 64
+        ldp     lr, x19, [sp], 16
         ret
 
 
