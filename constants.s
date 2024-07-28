@@ -43,6 +43,12 @@ CONSTANTS_S:
         .equ INNER_BOARD_ORIGIN_X,              BOARD_ORIGIN_X + TETRIS_CELL_SIZE
         .equ INNER_BOARD_ORIGIN_Y,              BOARD_ORIGIN_Y + TETRIS_CELL_SIZE
 
+        // For some reason these constants are computed incorrectly by the assembler, but the result is what is wanted.
+        .equ HELD_PIECE_ORIGIN_X,               BOARD_ORIGIN_X - (6 * TETRIS_CELL_SIZE) - TETRIS_CELL_SIZE
+        .equ HELD_PIECE_ORIGIN_Y,               BOARD_ORIGIN_Y + ((BOARD_HEIGHT - 2) * TETRIS_CELL_SIZE)
+        .equ NEXT_PIECE_ORIGIN_X,               BOARD_ORIGIN_X + ((BOARD_WIDTH + 3) * TETRIS_CELL_SIZE)
+        .equ NEXT_PIECE_ORIGIN_Y,               BOARD_ORIGIN_Y + ((BOARD_HEIGHT - 2) * TETRIS_CELL_SIZE)
+
 
 f32_0_9:
         .float                  0.9

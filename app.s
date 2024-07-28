@@ -310,16 +310,16 @@ game_loop__skip_update:
         mov     x2, x28
         bl      particle_manager_render
 
-        mov     x0, 64
-        mov     x1, 64
+        mov     x0, NEXT_PIECE_ORIGIN_X
+        mov     x1, NEXT_PIECE_ORIGIN_Y
         ldr     x2, [sp, TETROMINO_STATE + TSTATE_ID]
         mov     x3, x28
-        bl      draw_tetromino_at
+        bl      draw_framed_tetromino_at
 
         ldr     x9, [sp, HELD_PIECE_ID]
         cbz     x9, game_loop__skip_held_piece
-        mov     x0, 64
-        mov     x1, 128
+        mov     x0, HELD_PIECE_ORIGIN_X
+        mov     x1, HELD_PIECE_ORIGIN_Y
         sub     x2, x9, TETROMINO_ID_BIAS
         mov     x3, x28
         bl      draw_framed_tetromino_at
