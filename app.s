@@ -5,6 +5,7 @@
         .include "./line.s"
         .include "./rectangle.s"
         .include "./tetris_cell.s"
+        .include "./tetromino_generator.s"
         .include "./triangle.s"
         .include "./particle.s"
         .include "./util.s"
@@ -107,8 +108,8 @@
         .equ GAME_STATS,                CONSUMED_SWAP + 8                               // struct GameStats
         .equ INPUT_STATE,               GAME_STATS + STRUCT_GS_SIZE                     // struct InputState
         .equ TETROMINO_STATE,           INPUT_STATE + STRUCT_INPUT_STATE_SIZE           // struct TetrominoState
-        .equ CHOOSER_BAG_STATE,         TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct ChooserBagState
-        .equ BOARD_STATE,               CHOOSER_BAG_STATE + STRUCT_CBAG_STATE_SIZE      // struct BoardState
+        .equ TETROMINO_GENERATOR,       TETROMINO_STATE + STRUCT_TSTATE_SIZE            // struct TetrominoGenerator
+        .equ BOARD_STATE,               TETROMINO_GENERATOR + STRUCT_TETROMINO_GENERATOR_SIZE   // struct BoardState
         .equ PARTICLE_MANAGER,          BOARD_STATE + STRUCT_BSTATE_SIZE                // struct ParticleManager
 
         .equ STRUCT_GAME_STATE_SIZE,    PARTICLE_MANAGER + STRUCT_PM_SIZE
@@ -440,11 +441,11 @@ init_game_state:
         add     x0, x19, TETROMINO_STATE
         bl      init_tetromino_state
 
-        add     x0, x19, CHOOSER_BAG_STATE
-        bl      recreate_chooser_bag
+        add     x0, x19, TETROMINO_GENERATOR
+        bl      tetromino_generator_init
 
-        add     x0, x19, CHOOSER_BAG_STATE
-        bl      choose_next_tetromino
+        add     x0, x19, TETROMINO_GENERATOR
+        bl      tetromino_generator_advance
         stur    x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Set first tetromino.
 
         add     x0, x19, PARTICLE_MANAGER
@@ -1388,8 +1389,8 @@ handle_s:
 
         /* Choose new tetromino if no piece is currently held */
         cbnz    x9, handle_s__swap
-        add     x0, x19, CHOOSER_BAG_STATE
-        bl      choose_next_tetromino
+        add     x0, x19, TETROMINO_GENERATOR
+        bl      tetromino_generator_advance
         add     x9, x0, TETROMINO_ID_BIAS
 handle_s__swap:
 
@@ -1653,11 +1654,11 @@ restart_game:
         add     x0, x19, TETROMINO_STATE
         bl      init_tetromino_state
 
-        add     x0, x19, CHOOSER_BAG_STATE
-        bl      recreate_chooser_bag
+        add     x0, x19, TETROMINO_GENERATOR
+        bl      tetromino_generator_init
 
-        add     x0, x19, CHOOSER_BAG_STATE
-        bl      choose_next_tetromino
+        add     x0, x19, TETROMINO_GENERATOR
+        bl      tetromino_generator_advance
         stur    x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Set first tetromino.
 
         add	x0, x19, BOARD_STATE
@@ -1959,8 +1960,8 @@ try_place_tetromino_and_update:
         bl      get_time
         str     w0, [x19, LAST_DROP]                    // Set now as last drop
 
-        add     x0, x19, CHOOSER_BAG_STATE
-        bl      choose_next_tetromino                   // Choose new tetromino
+        add     x0, x19, TETROMINO_GENERATOR
+        bl      tetromino_generator_advance             // Choose new tetromino
         str     x0, [x19, TETROMINO_STATE + TSTATE_ID]  // Save new tetromino.
 
         str     xzr, [x19, CONSUMED_SWAP]               // Reset consumed_swap flag
@@ -2567,93 +2568,6 @@ check_collision__end_end:
         ldp     x22, x23, [sp, 32]
         ldp     x20, x21, [sp, 16]
         ldp     lr, x19, [sp], 64
-        ret
-
-
-
-/*
- * Params:
- *      x0: out struct ChooserBagState*  <- chooser_bag_state
- */
-recreate_chooser_bag:
-        stp     lr, x19, [sp, -48]!
-        stp     x20, x21, [sp, 16]
-        stp     x22, x23, [sp, 32]
-
-        mov     w19, NUM_TETROMINOS             // x19 <- NUM_TETROMINOS
-        strb    w19, [x0, CBAG_REMAINING]       // chooser_bag_state.remaining = NUM_TETROMINOS
-
-        add     x20, x0, CBAG_VALUES    // x20 = &chooser_bag_state.values[0]
-
-        mov     x21, 0                  // i = 0
-recreate_chooser_bag__init_values:
-        strb    w21, [x20]              // chooser_bag_state.values[i] = i
-        add     x20, x20, 1             // x20 = &chooser_bag_state.values[i + 1] (move to next byte)
-        add     x21, x21, 1             // i += 1
-        cmp     x21, NUM_TETROMINOS     // i < NUM_TETROMINOS ?
-        b.lt    recreate_chooser_bag__init_values
-        /* values == [0, 1, 2, 3, ..., NUM_TETROMINOS - 1] */
-
-
-        add     x20, x0, CBAG_VALUES    // x20 <- pointer to the beginning of the array's segment that remains 'not randomized'
-        mov     w21, NUM_TETROMINOS     // w21 <- amount of remaining (non randomized) tetrominos
-
-recreate_chooser_bag__randomize:
-        /* Gen random number in range [0..rem_tetrominos) */
-        mov     w0, 0
-        mov     w1, w21
-        bl      rand_gen_in_range
-        /* x0 contains random index */
-
-        // Swap a[0] with a[r]
-        add     x9, x20, x0     // x9 = &a[r] = pointer to the randomly chosen element
-        ldrb    w22, [x20]      // w22 = a[0]
-        ldrb    w23, [x9]       // w23 = a[r]
-        strb    w23, [x20]      // a[0] = a[r]
-        strb    w22, [x9]       // a[r] = a[0]
-
-        add     x20, x20, 1             // advance array pointer to the beginning of the next segment
-        subs    w21, w21, 1             // decrement remaining tetrominos
-        b.gt    recreate_chooser_bag__randomize // loop only if more than 1 tetromino is not yet randomized
-        /* values = [randomized] */
-
-
-        ldp     x22, x23, [sp, 32]
-        ldp     x20, x21, [sp, 16]
-        ldp     lr, x19, [sp], 48
-        ret
-
-
-
-/*
- * Params:
- *      x0: in/out struct ChooserBagState*  <- chooser_bag_state
- * Returns:
- *      x0: u64         <- tetromino_id
- */
-choose_next_tetromino:
-        stp     lr, x19, [sp, -16]!
-
-        mov     x19, x0         // x19 <- struct ChooserBagState*
-
-        ldrb    w9, [x19, CBAG_REMAINING]               // w9 = chooser_bag_state.remaining
-        cmp     w9, 0                                   // chooser_bag_state.remaining == 0 ?
-        b.gt    choose_next_tetromino__dont_recreate
-        /* Bag out of values, we need to recreate it */
-        mov     x0, x19
-        bl      recreate_chooser_bag
-choose_next_tetromino__dont_recreate:
-
-        /* Load last value and decrement remaining count */
-        ldrb    w9, [x19, CBAG_REMAINING]       // x9 = chooser_bag_state.remaining
-        sub     w9, w9, 1                       // x9 <- index of last element in bag
-        strb    w9, [x19, CBAG_REMAINING]       // chooser_bag_state.remaining -= 1
-        add     x9, x9, CBAG_VALUES             // x9 <- offset to start of array + index of last element
-        add     x9, x19, x9                     // x9 <- pointer to last element of array
-        ldrb    w0, [x9]                        // x0 = chooser_bag_state.values[LAST]
-
-
-        ldp     lr, x19, [sp], 16
         ret
 
 
