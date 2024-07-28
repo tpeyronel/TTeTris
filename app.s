@@ -311,9 +311,11 @@ game_loop__skip_update:
         mov     x2, x28
         bl      particle_manager_render
 
+        add     x0, sp, TETROMINO_GENERATOR
+        bl      tetromino_generator_peek_next
+        mov     x2, x0                          // x2 <- next tetromino id
         mov     x0, NEXT_PIECE_ORIGIN_X
         mov     x1, NEXT_PIECE_ORIGIN_Y
-        ldr     x2, [sp, TETROMINO_STATE + TSTATE_ID]
         mov     x3, x28
         bl      draw_framed_tetromino_at
 

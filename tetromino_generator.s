@@ -93,6 +93,45 @@ tetromino_generator_advance:
 
 /*
  * Params:
+ *      x0: in struct TetrominoGenerator*       <- tetromino_generator
+ * Returns:
+ *      x0: u64                                 <- tetromino_id of the next tetromino
+ */
+tetromino_generator_peek_next:
+        stp     lr, x19, [sp, -16]!
+
+        mov     x19, x0         // x19 <- struct TetrominoGenerator*
+
+        ldrb    w9, [x19, TGEN_CURRENT_BAG]             // w9 = current bag
+        ldrb    w10, [x19, TGEN_BAG_REMAINING]          // w10 = tetromino_generator.remaining
+
+        cmp     w10, 0                                  // tetromino_generator.remaining == 0 ?
+        b.gt    tetromino_generator_peek_next__same_bag
+        /* Bag out of values, we need to look at the next one */
+                add     w9, w9, 1
+                and     w9, w9, 1                       // w9 = next bag
+                mov     w10, NUM_TETROMINOS - 1         // w10 = index of the last element of the next bag
+                b       tetromino_generator_peek_next__exit_if
+
+        tetromino_generator_peek_next__same_bag:
+                sub     w10, w10, 1                     // w10 = index of the last element of the current bag
+
+        tetromino_generator_peek_next__exit_if:
+        mov     w11, BAG_SIZE
+        mul     w9, w9, w11                     // w9 <- offset in bytes to the desired bag, relative to the first bag (i.e. 0 or BAG_SIZE)
+        add     w9, w9, TGEN_BAG_A              // w9 <- offest in bytes to the desired bag, relative to &tetromino_generator
+
+        add     x9, x19, x9                     // x9 <- address of the desired bag
+        add     x9, x9, x10                     // x9 <- address of the desired element in the desired bag
+        ldrb    w0, [x9]                        // w0 <- next tetromino id
+
+        ldp     lr, x19, [sp], 16
+        ret
+
+
+
+/*
+ * Params:
  *      x0: out u32[NUM_TETROMINOS]     <- bag state
  */
 recreate_chooser_bag:
