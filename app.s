@@ -337,8 +337,8 @@ game_loop__skip_held_piece:
         bl      draw_destroy_particles
 
         mov     x0, 120
-        mov     x1, 80
-        mov     x2, 180
+        mov     x1, 120
+        mov     x2, 150
         mov     x3, 281
         mov     x4, 17
         mov     x5, 249
