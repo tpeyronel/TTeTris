@@ -3,12 +3,15 @@ MESH_S:
         .include "./constants.s"
         .include "./math.s"
         .include "./line.s"
+        .include "./time.s"
 
 /* struct Mesh */
         .equ MESH_TRIANGLE_COUNT,       0       // u32
         .equ MESH_VERTEX_COUNT,         4       // u32
         .equ MESH_DATA,                 8       // u32[3 * TRIANGLE_COUNT "= INDEX_COUNT"] followed by Vec4[VERTEX_COUNT]
 
+
+F32_TIME_TO_ANGLE: .float       0.000001
 
 CUBE_MESH:
         .word   12
@@ -145,9 +148,12 @@ draw_mesh:
         /* Setup MVP matrix */
                 sub     sp, sp, STRUCT_MAT4_SIZE
 
+                bl      get_time
+                scvtf   s0, w0
+                ldr     s1, F32_TIME_TO_ANGLE
+                fmul    s0, s0, s1
 
                 mov     x0, sp
-                ldr     s0, F32_FRAC_TAU_10
                 bl      mat4_new_rotation_y
 
                 mov     x0, x23
