@@ -143,10 +143,97 @@ mat4_new_rot_y:
 
 /*
  * Params:
+ *      x0: out Mat4*
+ * * * * *
+ *      s0: f32         <- scale x
+ *      s1: f32         <- scale y
+ *      s2: f32         <- scale z
+ */
+mat4_new_scale:
+    /*
+     * -----------------------------------------
+     * |   s_x   |    0    |    0    |    0    |
+     * |    0    |   s_y   |    0    |    0    |
+     * |    0    |    0    |   s_z   |    0    |
+     * |    0    |    0    |    0    |    1    |
+     * -----------------------------------------
+     */
+    str     s0,  [x0, MAT4_COL0 + VEC4_X]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL0 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL1 + VEC4_X]
+    str     s1,  [x0, MAT4_COL1 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL1 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL1 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL2 + VEC4_X]
+    str     wzr, [x0, MAT4_COL2 + VEC4_Y]
+    str     s2,  [x0, MAT4_COL2 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL2 + VEC4_W]
+
+    fmov    s0, 1.0
+    str     wzr, [x0, MAT4_COL3 + VEC4_X]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Z]
+    str     s0,  [x0, MAT4_COL3 + VEC4_W]
+
+    ret
+
+
+
+/*
+ * Params:
+ *      x0: out Mat4*
+ * * * * *
+ *      s0: f32         <- translation x
+ *      s1: f32         <- translation y
+ *      s2: f32         <- translation z
+ */
+mat4_new_translation:
+    /*
+     * -----------------------------------------
+     * |    1    |    0    |    0    |   t_x   |
+     * |    0    |    1    |    0    |   t_y   |
+     * |    0    |    0    |    1    |   t_z   |
+     * |    0    |    0    |    0    |    1    |
+     * -----------------------------------------
+     */
+    str     s0,  [x0, MAT4_COL3 + VEC4_X]
+    str     s1,  [x0, MAT4_COL3 + VEC4_Y]
+    str     s2,  [x0, MAT4_COL3 + VEC4_Z]
+
+    fmov    s0, 1.0
+
+    str     s0,  [x0, MAT4_COL3 + VEC4_W]
+
+    str     s0,  [x0, MAT4_COL0 + VEC4_X]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL0 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL1 + VEC4_X]
+    str     s0,  [x0, MAT4_COL1 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL1 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL1 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL2 + VEC4_X]
+    str     wzr, [x0, MAT4_COL2 + VEC4_Y]
+    str     s0,  [x0, MAT4_COL2 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL2 + VEC4_W]
+
+
+    ret
+
+
+
+/*
+ * Params:
  *      s0: f32     <- angle in radians
  * Returns:
  *      s0: f32     <- cos(x)
-* Based on https://stackoverflow.com/a/28050328
+ * Based on https://stackoverflow.com/a/28050328
  */
 cos:
     ldr     s1, F32_FRAC_1_TAU
