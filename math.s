@@ -96,6 +96,32 @@ vec4_mul_mat4_inplace:
 
 /*
  * Params:
+ *      x0: in Vec4*
+ *      x1: in Mat4*
+ *      x2: out Vec4*
+ */
+vec4_mul_mat4_new:
+    /* Load vector column into v0 */
+    ld1     { v0.4s }, [x0]
+
+    /* Load all matrix columns into v1 - v4 */
+    ld1     { v1.4s }, [x1], #16
+    ld1     { v2.4s }, [x1], #16
+    ld1     { v3.4s }, [x1], #16
+    ld1     { v4.4s }, [x1], #16
+
+    fmul    v1.4s, v1.4s, v0.4s[0]
+    fmla    v1.4s, v2.4s, v0.4s[1]
+    fmla    v1.4s, v3.4s, v0.4s[2]
+    fmla    v1.4s, v4.4s, v0.4s[3]
+
+    st1     { v1.4s }, [x2]
+    ret
+
+
+
+/*
+ * Params:
  *      v0.4s: f32         <- row 0
  *      v1.4s: f32         <- row 1
  *      v2.4s: f32         <- row 2
