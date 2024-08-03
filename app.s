@@ -11,6 +11,7 @@
         .include "./util.s"
         .include "./rand.s"
         .include "./background.s"
+        .include "./math.s"
 
         .equ MOVEMENT_PER_STEP,         16
 
@@ -176,6 +177,49 @@ main:
         sub     sp, sp, 8
         // TODO: clean framebuffer saving
         str     x0, [sp]        // Save framebuffer to stack
+
+        /* Enable SIMD (not required?) */
+        mov     x1, (0x3 << 20)
+        msr     cpacr_el1, x1
+        isb
+
+        sub     sp, sp, STRUCT_VEC4_SIZE
+
+        mov     x0, sp
+        ldr     s0, F32_1
+        ldr     s1, F32_1
+        ldr     s2, F32_1
+        bl      vec4_new_position
+
+        sub     sp, sp, STRUCT_MAT4_SIZE
+
+        mov     x0, sp
+        ldr     s0, F32_120
+        ldr     s1, F32_120
+        ldr     s2, F32_120
+        bl      mat4_new_scale
+
+                sub     sp, sp, STRUCT_MAT4_SIZE
+
+                mov     x0, sp
+                ldr     s0, F32_320
+                ldr     s1, F32_240
+                movi    d2, 0
+                bl      mat4_new_translation
+
+                add     x0, sp, STRUCT_MAT4_SIZE
+                mov     x1, sp
+                bl      mat4_mul_mat4_inplace
+
+                add     sp, sp, STRUCT_MAT4_SIZE
+
+        add     x0, sp, STRUCT_MAT4_SIZE
+        mov     x1, sp
+        bl      vec4_mul_mat4_inplace
+
+        add     sp, sp, STRUCT_MAT4_SIZE
+        add     sp, sp, STRUCT_VEC4_SIZE
+
 
         // mov     x28, x0         // Save framebuffer address to x28
         ldr     x28, =BACK_BUFFER_ADDRESS

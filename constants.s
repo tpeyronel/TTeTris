@@ -55,6 +55,29 @@ f32_0_9:
 f32_1000000:
         .float                  1000000
 
+        F32_0:  .float          0.0
+        F32_1:  .float          1.0
+        F32_2:  .float          2.0
+        F32_3:  .float          3.0
+        F32_4:  .float          4.0
+        F32_5:  .float          5.0
+        F32_6:  .float          6.0
+        F32_7:  .float          7.0
+        F32_8:  .float          8.0
+        F32_9:  .float          9.0
+        F32_10:  .float         10.0
+        F32_11:  .float         11.0
+        F32_12:  .float         12.0
+        F32_13:  .float         13.0
+        F32_14:  .float         14.0
+        F32_15:  .float         15.0
+        F32_16:  .float         16.0
+
+        F32_320: .float         320.0
+        F32_240: .float         240.0
+        F32_160: .float         160.0
+        F32_120: .float         120.0
+
 
 /* struct Tetromino */
         .equ TETROMINO_DIFFUSE_COLOR,   0                               // u32
