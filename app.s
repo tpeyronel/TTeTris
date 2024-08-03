@@ -12,6 +12,7 @@
         .include "./rand.s"
         .include "./background.s"
         .include "./math.s"
+        .include "./mesh.s"
 
         .equ MOVEMENT_PER_STEP,         16
 
@@ -354,6 +355,10 @@ game_loop__skip_update:
         mov     x1, 2
         mov     x2, x28
         bl      particle_manager_render
+
+        ldr     x0, =CUBE_MESH
+        mov     x1, x28
+        bl      draw_mesh
 
         add     x0, sp, TETROMINO_GENERATOR
         bl      tetromino_generator_peek_next
