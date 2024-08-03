@@ -31,6 +31,67 @@ F32_0_225: .float  0.225
 
 /*
  * Params:
+ *      x0: out Vec4*
+ * * * * *
+ *      s0: f32         <- x
+ *      s1: f32         <- y
+ *      s2: f32         <- z
+ *      s3: f32         <- w
+ */
+vec4_init:
+    str     s0, [x0, VEC4_X]
+    str     s1, [x0, VEC4_Y]
+    str     s2, [x0, VEC4_Z]
+    str     s3, [x0, VEC4_W]
+    ret
+
+
+
+/*
+ * Params:
+ *      x0: in/out Vec4*
+ *      x1: in Mat4*
+ */
+vec4_mul_mat4_inplace:
+    /* Load vector column into v0 */
+    ld1     { v0.4s }, [x0]
+
+    /* Load all matrix columns into v1 - v4 */
+    ld1     { v1.4s }, [x1], #16
+    ld1     { v2.4s }, [x1], #16
+    ld1     { v3.4s }, [x1], #16
+    ld1     { v4.4s }, [x1], #16
+
+    fmul    v1.4s, v1.4s, v0.4s[0]
+    fmla    v1.4s, v2.4s, v0.4s[1]
+    fmla    v1.4s, v3.4s, v0.4s[2]
+    fmla    v1.4s, v4.4s, v0.4s[3]
+
+    st1     { v1.4s }, [x0]
+    ret
+
+
+
+/*
+ * Params:
+ *      v0.4s: f32         <- row 0
+ *      v1.4s: f32         <- row 1
+ *      v2.4s: f32         <- row 2
+ *      v3.4s: f32         <- row 3
+ *      x0: out Mat4*
+ */
+mat4_init:
+    st1     { v0.4s }, [x0], #16
+    st1     { v1.4s }, [x0], #16
+    st1     { v2.4s }, [x0], #16
+    st1     { v3.4s }, [x0], #16
+    ret
+
+
+
+
+/*
+ * Params:
  *      s0: f32     <- angle in radians
  * Returns:
  *      s0: f32     <- cos(x)
