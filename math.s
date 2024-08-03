@@ -88,6 +88,57 @@ mat4_init:
     ret
 
 
+/*
+ * Params:
+ *      x0: out Mat4*
+ * * * * *
+ *      s0: f32         <- rotation angle (radians)
+ */
+mat4_new_rot_y:
+    /*
+     * -----------------------------------------
+     * |  cos(r) |    0    |  sin(r) |    0    |
+     * |    0    |    1    |    0    |    0    |
+     * | -sin(r) |    0    |  cos(r) |    0    |
+     * |    0    |    0    |    0    |    1    |
+     * -----------------------------------------
+     */
+    str     lr, [sp, -8]!
+    str     s19, [sp, -8]!
+
+    fmov    s19, s0     // s19 = r
+    bl      cos         // s0 = cos(r)
+    str     s0, [x0, MAT4_COL0 + VEC4_X]
+    str     s0, [x0, MAT4_COL2 + VEC4_Z]
+
+    fmov    s0, s19     // s0 = r
+    bl      sin         // s0 = sin(r)
+    str     s0, [x0, MAT4_COL2 + VEC4_X]
+    fneg    s0, s0      // s0 = -sin(r)
+    str     s0, [x0, MAT4_COL0 + VEC4_Z]
+
+    str     wzr, [x0, MAT4_COL0 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL0 + VEC4_W]
+
+    fmov    s0, 1.0
+
+    str     wzr, [x0, MAT4_COL1 + VEC4_X]
+    str     s0, [x0, MAT4_COL1 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL1 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL1 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL2 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL2 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL3 + VEC4_X]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Z]
+    str     s0, [x0, MAT4_COL3 + VEC4_W]
+
+    ldr     s19, [sp], 8
+    ldr     lr, [sp], 8
+    ret
+
 
 
 /*
@@ -129,9 +180,13 @@ cos:
  *      s0: f32     <- sin(x)
  */
 sin:
+    str     lr, [sp, -8]!
+
     ldr     s1, F32_FRAC_TAU_4
     fsub    s0, s0, s1      // x -= TAU/4
     bl      cos
+
+    ldr     lr, [sp], 8
     ret
 
 
