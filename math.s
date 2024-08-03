@@ -199,7 +199,7 @@ mat4_mul_mat4_inplace:
  * * * * *
  *      s0: f32         <- rotation angle (radians)
  */
-mat4_new_rot_y:
+mat4_new_rotation_y:
     /*
      * -----------------------------------------
      * |  cos(r) |    0    |  sin(r) |    0    |
