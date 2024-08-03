@@ -192,6 +192,44 @@ mat4_mul_mat4_inplace:
     ret
 
 
+/*
+ * Params:
+ *      x0: out Mat4*
+ */
+mat4_new_identity:
+    /*
+     * -----------------------------------------
+     * |    1    |    0    |    0    |    0    |
+     * |    0    |    1    |    0    |    0    |
+     * |    0    |    0    |    1    |    0    |
+     * |    0    |    0    |    0    |    1    |
+     * -----------------------------------------
+     */
+    fmov    s0, 1.0
+
+    str     s0,  [x0, MAT4_COL0 + VEC4_X]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL0 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL1 + VEC4_X]
+    str     s0,  [x0, MAT4_COL1 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL1 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL1 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL2 + VEC4_X]
+    str     wzr, [x0, MAT4_COL2 + VEC4_Y]
+    str     s0,  [x0, MAT4_COL2 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL2 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL3 + VEC4_X]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Z]
+    str     s0,  [x0, MAT4_COL3 + VEC4_W]
+
+    ret
+
+
 
 /*
  * Params:
