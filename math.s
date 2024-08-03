@@ -49,6 +49,24 @@ vec4_init:
 
 /*
  * Params:
+ *      x0: out Vec4*
+ * * * * *
+ *      s0: f32         <- x
+ *      s1: f32         <- y
+ *      s2: f32         <- z
+ */
+vec4_new_position:
+    str     s0, [x0, VEC4_X]
+    str     s1, [x0, VEC4_Y]
+    str     s2, [x0, VEC4_Z]
+    fmov    s0, 1.0
+    str     s0, [x0, VEC4_W]
+    ret
+
+
+
+/*
+ * Params:
  *      x0: in/out Vec4*
  *      x1: in Mat4*
  */
