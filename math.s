@@ -106,6 +106,63 @@ mat4_init:
     ret
 
 
+
+/*
+ * Params:
+ *      x0: in/out Mat4*
+ *      x1: in Mat4*
+ * Note:
+ *      The resulting matrix is mathematically equivalent to x1 * x0,
+ *      i.e., first x0 is applied, then x1 is applied.
+ */
+mat4_mul_mat4_inplace:
+    /* Load all of this' matrix columns into v0-v3 */
+    ld1     { v0.4s }, [x0], #16
+    ld1     { v1.4s }, [x0], #16
+    ld1     { v2.4s }, [x0], #16
+    ld1     { v3.4s }, [x0], #16
+
+    /* Undo post index additions, as we will need original x0 later */
+    sub     x0, x0, #64
+
+    /* Load all of others' matrix columns into v4-v7 */
+    ld1     { v4.4s }, [x1], #16
+    ld1     { v5.4s }, [x1], #16
+    ld1     { v6.4s }, [x1], #16
+    ld1     { v7.4s }, [x1], #16
+
+    /* First column */
+    fmul    v8.4s, v4.4s, v0.4s[0]
+    fmla    v8.4s, v5.4s, v0.4s[1]
+    fmla    v8.4s, v6.4s, v0.4s[2]
+    fmla    v8.4s, v7.4s, v0.4s[3]
+    st1     { v8.4s }, [x0], #16
+
+    /* Second column */
+    fmul    v8.4s, v4.4s, v1.4s[0]
+    fmla    v8.4s, v5.4s, v1.4s[1]
+    fmla    v8.4s, v6.4s, v1.4s[2]
+    fmla    v8.4s, v7.4s, v1.4s[3]
+    st1     { v8.4s }, [x0], #16
+
+    /* Third column */
+    fmul    v8.4s, v4.4s, v2.4s[0]
+    fmla    v8.4s, v5.4s, v2.4s[1]
+    fmla    v8.4s, v6.4s, v2.4s[2]
+    fmla    v8.4s, v7.4s, v2.4s[3]
+    st1     { v8.4s }, [x0], #16
+
+    /* Fourth column */
+    fmul    v8.4s, v4.4s, v3.4s[0]
+    fmla    v8.4s, v5.4s, v3.4s[1]
+    fmla    v8.4s, v6.4s, v3.4s[2]
+    fmla    v8.4s, v7.4s, v3.4s[3]
+    st1     { v8.4s }, [x0], #16
+
+    ret
+
+
+
 /*
  * Params:
  *      x0: out Mat4*
