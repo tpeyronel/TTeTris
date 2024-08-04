@@ -148,6 +148,17 @@ draw_mesh:
         /* Setup MVP matrix */
                 sub     sp, sp, STRUCT_MAT4_SIZE
 
+                mov     x0, sp
+                fmov    s0, 0.25
+                fmov    s1, 0.25
+                fmov    s2, 0.25
+                bl      mat4_new_scale
+
+                mov     x0, x23
+                mov     x1, sp
+                bl      mat4_mul_mat4_inplace
+
+
                 bl      get_time
                 scvtf   s0, w0
                 ldr     s1, F32_TIME_TO_ANGLE
@@ -170,10 +181,11 @@ draw_mesh:
                 bl      mat4_mul_mat4_inplace
 
 
+                /* Convert from NDC space to screen space */
                 mov     x0, sp
-                ldr     s0, F32_120
-                ldr     s1, F32_120
-                ldr     s2, F32_120
+                ldr     s0, F32_320
+                ldr     s1, F32_240
+                ldr     s2, F32_1
                 bl      mat4_new_scale
 
                 mov     x0, x23
