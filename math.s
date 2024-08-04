@@ -474,4 +474,30 @@ sin:
 
 
 
+/*
+ * Params:
+ *      s0: f32     <- angle in radians
+ * Returns:
+ *      s0: f32     <- tan(x)
+ */
+tan:
+    str     lr, [sp, -16]!
+    str     s19, [sp, 8]
+
+    fmov    s19, s0     // s19 <- x
+
+    bl      cos         // s0 <- cos(x)
+    fmov    s1, s0      // s1 <- cos(x)
+    fmov    s0, s19     // s0 <- x
+    fmov    s19, s1     // s19 <- cos(x)
+
+    bl      sin         // s0 <- sin(x)
+    fdiv    s0, s0, s19 // s0 <- sin(x) / cos(x) = tan(x)
+
+    ldr     s19, [sp, 8]
+    ldr     lr, [sp], 16
+    ret
+
+
+
 .endif
