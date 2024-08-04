@@ -460,6 +460,94 @@ mat4_new_translation:
 
 /*
  * Params:
+ *      x0: out Mat4*
+ * * * * *
+ *      s0: f32         <- near
+ *      s1: f32         <- far
+ *      s2: f32         <- fov (in radians)
+ *      s3: f32         <- aspect ratio
+ * Note:
+ *      near and far must both be positive (the z axis gets inverted)
+ */
+mat4_new_perspective:
+    /*
+     * ----------------------------------------------------
+     * | 1 / (ar * t) |   0   |      0      |      0      |
+     * |       0      | 1 / t |      0      |      0      |
+     * |       0      |   0   | (n+f)/(n-f) | 2*n*f/(n-f) |
+     * |       0      |   0   |     -1      |      0      |
+     * ----------------------------------------------------
+     * where:
+     *      a = aspect ratio
+     *      t = tan(fov / 2)
+     */
+    stp     lr, x19, [sp, -16]!
+
+    mov     x19, x0         // x19 <- matrix pointer
+
+    fsub    s9, s0, s1      // s9 = near - far
+    fmov    s10, 1.0
+    fdiv    s9, s10, s9     // s9 = 1 / (near - far)
+
+    fadd    s10, s0, s1     // s10 = near + far
+    fmul    s10, s10, s9    // s10 = (near + far) / (near - far)
+    str     s10, [x19, MAT4_COL2 + VEC4_Z]
+
+    fmov    s10, 2.0        // s10 = 2
+    fmul    s10, s10, s0    // s10 = 2 * near
+    fmul    s10, s10, s1    // s10 = 2 * near * far
+    fmul    s10, s10, s9    // s10 = 2 * near * far / (near - far)
+    str     s10, [x19, MAT4_COL3 + VEC4_Z]
+
+
+
+    sub     sp, sp, 16
+    str     s3, [sp]        // Save aspect ratio to stack
+
+    fmov    s9, 0.5
+    fmul    s0, s2, s9      // s0 = fov / 2
+    bl      tan             // s0 = tan(fov / 2)
+
+    ldr     s1, [sp]        // s1 = aspect ratio
+    add     sp, sp, 16
+
+    fmul    s0, s1, s0      // s0 = aspect ratio * tan(fov / 2)
+
+    fmov    s9, 1.0
+    fdiv    s0, s9, s0      // s0 = 1 / (aspect ratio * tan(fov / 2))
+    str     s0, [x19, MAT4_COL0 + VEC4_X]
+
+    fmul    s0, s0, s1      // s0 = 1 / tan(fov / 2)
+    str     s0, [x19, MAT4_COL1 + VEC4_Y]
+
+    fmov    s0, -1.0
+    str     s0, [x19, MAT4_COL2 + VEC4_W]
+
+
+
+    str     wzr, [x19, MAT4_COL0 + VEC4_Y]
+    str     wzr, [x19, MAT4_COL0 + VEC4_Z]
+    str     wzr, [x19, MAT4_COL0 + VEC4_W]
+
+    str     wzr, [x19, MAT4_COL1 + VEC4_X]
+    str     wzr, [x19, MAT4_COL1 + VEC4_Z]
+    str     wzr, [x19, MAT4_COL1 + VEC4_W]
+
+    str     wzr, [x19, MAT4_COL2 + VEC4_X]
+    str     wzr, [x19, MAT4_COL2 + VEC4_Y]
+
+    str     wzr, [x19, MAT4_COL3 + VEC4_X]
+    str     wzr, [x19, MAT4_COL3 + VEC4_Y]
+    str     wzr, [x19, MAT4_COL3 + VEC4_W]
+
+
+    ldp     lr, x19, [sp], 16
+    ret
+
+
+
+/*
+ * Params:
  *      s0: f32     <- angle in radians
  * Returns:
  *      s0: f32     <- cos(x)
