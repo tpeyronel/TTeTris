@@ -181,6 +181,30 @@ draw_mesh:
                 bl      mat4_mul_mat4_inplace
 
 
+                mov     x0, sp
+                movi    d0, 0
+                movi    d1, 0
+                ldr     s2, F32_1
+                fneg    s2, s2
+                bl      mat4_new_translation
+
+                mov     x0, x23
+                mov     x1, sp
+                bl      mat4_mul_mat4_inplace
+
+
+                mov     x0, sp
+                ldr     s0, F32_1
+                ldr     s1, F32_16
+                ldr     s2, F32_FRAC_TAU_4
+                ldr     s3, F32_ASPECT_RATIO
+                bl      mat4_new_perspective
+
+                mov     x0, x23
+                mov     x1, sp
+                bl      mat4_mul_mat4_inplace
+
+
                 /* Convert from NDC space to screen space */
                 mov     x0, sp
                 ldr     s0, F32_320
