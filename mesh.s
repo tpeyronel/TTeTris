@@ -265,19 +265,19 @@ draw_mesh_triangle:
         /* (x0 = first vertex) */
         mov     x1, x20
         mov     x2, sp
-        bl      vec4_mul_mat4_new
+        bl      vec4_mul_mat4_and_perspective_divide_new
 
         sub     sp, sp, STRUCT_VEC4_SIZE
         mov     x0, x21
         mov     x1, x20
         mov     x2, sp
-        bl      vec4_mul_mat4_new
+        bl      vec4_mul_mat4_and_perspective_divide_new
 
         sub     sp, sp, STRUCT_VEC4_SIZE
         mov     x0, x22
         mov     x1, x20
         mov     x2, sp
-        bl      vec4_mul_mat4_new
+        bl      vec4_mul_mat4_and_perspective_divide_new
 
 
         ldr     s9, [sp, VEC4_X]
