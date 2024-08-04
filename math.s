@@ -548,6 +548,48 @@ mat4_new_perspective:
 
 /*
  * Params:
+ *      x0: out Mat4*
+ * * * * *
+ *      s0: f32         <- aspect ratio
+ */
+mat4_new_orthographic:
+    /*
+     * ----------------------------------
+     * |   1   |    0   |   0   |   0   |
+     * |   0   | aspect |   0   |   0   |
+     * |   0   |    0   |   1   |   0   |
+     * |   0   |    0   |   0   |   1   |
+     * ----------------------------------
+     */
+    str     s0,  [x0, MAT4_COL1 + VEC4_Y]
+
+    fmov    s0, 1.0
+
+    str     s0,  [x0, MAT4_COL0 + VEC4_X]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL0 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL0 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL1 + VEC4_X]
+    str     wzr, [x0, MAT4_COL1 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL1 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL2 + VEC4_X]
+    str     wzr, [x0, MAT4_COL2 + VEC4_Y]
+    str     s0,  [x0, MAT4_COL2 + VEC4_Z]
+    str     wzr, [x0, MAT4_COL2 + VEC4_W]
+
+    str     wzr, [x0, MAT4_COL3 + VEC4_X]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Y]
+    str     wzr, [x0, MAT4_COL3 + VEC4_Z]
+    str     s0,  [x0, MAT4_COL3 + VEC4_W]
+
+    ret
+
+
+
+/*
+ * Params:
  *      s0: f32     <- angle in radians
  * Returns:
  *      s0: f32     <- cos(x)
