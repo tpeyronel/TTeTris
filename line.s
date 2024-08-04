@@ -177,6 +177,16 @@ draw_line:
         stp     lr, x19, [sp, -32]!
         stp     x20, x21, [sp, 16]
 
+        cmp     x0, SCREEN_WIDTH
+        b.hs    draw_line__end
+        cmp     x1, SCREEN_HEIGH
+        b.hs    draw_line__end
+        cmp     x2, SCREEN_WIDTH
+        b.hs    draw_line__end
+        cmp     x3, SCREEN_HEIGH
+        b.hs    draw_line__end
+
+
         // TODO: implement hor. line and ver. line subroutines?
 
         // Convert game y coordinates to screen y coordinates
