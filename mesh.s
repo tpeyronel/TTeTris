@@ -193,12 +193,21 @@ draw_mesh:
                 bl      mat4_mul_mat4_inplace
 
 
+                // mov     x0, sp
+                // ldr     s0, F32_1
+                // ldr     s1, F32_16
+                // ldr     s2, F32_FRAC_TAU_4
+                // ldr     s3, F32_ASPECT_RATIO
+                // bl      mat4_new_perspective
+
+                // mov     x0, x23
+                // mov     x1, sp
+                // bl      mat4_mul_mat4_inplace
+
+
                 mov     x0, sp
-                ldr     s0, F32_1
-                ldr     s1, F32_16
-                ldr     s2, F32_FRAC_TAU_4
-                ldr     s3, F32_ASPECT_RATIO
-                bl      mat4_new_perspective
+                ldr     s0, F32_ASPECT_RATIO
+                bl      mat4_new_orthographic
 
                 mov     x0, x23
                 mov     x1, sp
