@@ -73,10 +73,14 @@ f32_1000000:
         F32_15:  .float         15.0
         F32_16:  .float         16.0
 
+        F32_640: .float         640.0
+        F32_480: .float         480.0
         F32_320: .float         320.0
         F32_240: .float         240.0
         F32_160: .float         160.0
         F32_120: .float         120.0
+
+        F32_ASPECT_RATIO: .float        1.3333333333333333333333333
 
 
 /* struct Tetromino */
